@@ -202,6 +202,31 @@ test/storage.test.mjs      rows: 9   asserts: 69     fail: 0
    §数字从哪来 D 段是**只读复现**（同种子命名空间、不落盘），非那次真正写文件运行的控制台输出。
 3. **Electron 壳未真实启动**：`electron/main.cjs` 仅过 `npm run check` 语法门；仓内不装 electron（README/DESIGN 已声明）。
 4. **移动端未真机验证**：`css/game.css` 断点、`js/view.js` 的 `touch-action: none` 已写，无真机跑过。
-5. **Actions 未在本机执行**：`ci.yml`（unit + SKIP_UNIT browser job）、`pages.yml`（`cp index.html css js`）仅静态存在，
-   其等价命令在本地分别对应 §验收结论的 node 段与（未跑的）浏览器段。
+5. **Actions 已实跑**：`ci.yml`（unit + SKIP_UNIT browser job）与 `pages.yml`（`cp index.html css js`）
+   原本仅静态存在；发布后 GitHub Actions 已真实跑绿，见下面的「线上验收」一节。
 6. 除以上外**无其它未实现项**：核心代数、对账 BFS、生成/复验、存档退化、确定性、视图几何均有对应已跑绿的 node 断言或只读复现命令支撑。
+
+## 线上验收（GitHub Pages，主代理 2026-09-27 实抓）
+
+发布 sha `7f9551c`，CI trigger `ceff4d0` → Actions `success`。
+
+主代理自己的门禁复跑（不是任何子代理的转述）：`npm run check` rc=0；node **93 / 0 fail**；
+浏览器 **92 / 0 fail** 且 `=== ALL GREEN ===` rc=0，逐段为
+`@boot 14`、`@play 27`、`@routes 14`、`@save 16`、`@pointer 21`；`js/core/grid.js` 的 `allDark`
+已从"幽灵导出"变为真被 `make.js`（起始盘）与 `library.js`（答案回放）引用。
+
+| 资源 | 结果 |
+| --- | --- |
+| `/`（index.html） | 200 / 2,273 B |
+| `js/main.js` | 200 / 16,518 B |
+| `css/game.css` | 200 / 7,035 B |
+| `js/data/lots.js` | 200 / 5,193 B |
+| `<title>` | 与 README 首行一致（熄灯盘） |
+
+浏览器段此前一片红（20 条失败）的根因值得留在文档里，因为它不是算法错、也不是渲染错：
+CDP 驱动把 `view.cellCenter()` 返回的 **canvas CSS 像素**直接当作 `Input.dispatchMouseEvent` 的
+视口坐标发出，于是每一次点灯都偏移了画布原点（约 `18,71`）——点到左上邻格，或干脆点到盘外
+（角上那格点击后 press 计数为 0）。修法是在 `tools/playtest.mjs` 里加 `lampPoint()` 平移；
+`view.js` 自己的契约（`cellAt()` 与 `main.js` 的 `clientX - rect.left` 同一坐标系）本来就自洽，
+所以这是**测试侧**的错。另一处 `"2枚举 16 个陪集"` 是读数把数字与注解挤进同一个 `<dd>`，
+现在数字独占 `<dd>`、注解进兄弟 `<small>`。
