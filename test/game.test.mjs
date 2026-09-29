@@ -139,6 +139,17 @@ test('the grade is a statement about presses versus par', () => {
   eq(grade(g).stars, 1, 'anything beyond par+2 is still a win, just not a tidy one');
 });
 
+// 上面那条从 par 跳到 par+2，中间那一档（多按一手）一次都没被测过：把三星的线挪到 par+1，
+// 门禁照样全绿。所以这条单独钉边界。它摆的是状态而不是真实对局 —— 出货盘上按不出"par+1 手就赢"，
+// 因为 4×4 最轻的非空 quiet pattern 要 8 个键（见 test/gf2-vs-bfs.test.mjs），赢局的按键数只会
+// 从 par 直接跳到 par+6 往上；grade 却是外壳随时会调的纯函数，它的那条线必须自己有用例。
+test('三星的线正落在 par 上：多按一手就退成两星', () => {
+  eq(grade({ done: true, presses: 2, par: 2 }), { stars: 3, label: '最优熄灯' }, 'exactly par is three stars');
+  eq(grade({ done: true, presses: 3, par: 2 }), { stars: 2, label: '干净收场' }, 'par+1 must not buy three stars');
+  eq(grade({ done: true, presses: 4, par: 2 }), { stars: 2, label: '干净收场' }, 'par+2 is the last two-star step');
+  eq(grade({ done: true, presses: 5, par: 2 }), { stars: 1, label: '灯全熄了' }, 'par+3 already drops');
+});
+
 test('answerCells reveals the shipped key set in 1-based coordinates', () => {
   const g = createGame(HANDLOT);
   eq(answerCells(g), [{ r: 1, c: 2 }, { r: 1, c: 4 }], 'keys 1 and 3 are the first row, second and fourth cell');
