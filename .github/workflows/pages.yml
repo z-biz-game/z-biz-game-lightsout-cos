@@ -21,12 +21,16 @@ jobs:
       - uses: actions/checkout@v4
       # No bundler and no dependencies: the game ships plain ES modules, so the site is a
       # file copy. Only these paths are reachable from index.html — keep the server, the
-      # electron shell, the generator, the tools and the tests out of the artifact.
+      # electron shell, the tools and the tests out of the artifact. art/ 现在也是可达资源
+      # （图标、og 卡、游戏内纹理与 sprite），只有产资产的 art/gen/ 不发。
       - name: Assemble static site
         run: |
           mkdir _site
-          cp index.html _site/
+          cp index.html manifest.webmanifest sw.js favicon.ico _site/
           cp -r css js _site/
+          mkdir -p _site/art
+          cp -r art/icons art/textures art/sprites _site/art/
+          cp art/og.png _site/art/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
