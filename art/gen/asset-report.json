@@ -1,0 +1,120 @@
+{
+ "files": {
+  "art/icons/apple-touch-icon.png": {
+   "bytes": 28845,
+   "h": 180,
+   "sha256": "61e51ef5af2d51f2",
+   "w": 180
+  },
+  "art/icons/icon-1024.png": {
+   "bytes": 621875,
+   "h": 1024,
+   "sha256": "4f302ad09c845e7c",
+   "w": 1024
+  },
+  "art/icons/icon-16.png": {
+   "bytes": 667,
+   "h": 16,
+   "sha256": "b9d2752f233badbf",
+   "w": 16
+  },
+  "art/icons/icon-180.png": {
+   "bytes": 28845,
+   "h": 180,
+   "sha256": "61e51ef5af2d51f2",
+   "w": 180
+  },
+  "art/icons/icon-192.png": {
+   "bytes": 32332,
+   "h": 192,
+   "sha256": "4abe2646fe4ad97a",
+   "w": 192
+  },
+  "art/icons/icon-32.png": {
+   "bytes": 1877,
+   "h": 32,
+   "sha256": "0eb12cd715b65e82",
+   "w": 32
+  },
+  "art/icons/icon-48.png": {
+   "bytes": 3590,
+   "h": 48,
+   "sha256": "70f59a18c03b6331",
+   "w": 48
+  },
+  "art/icons/icon-512.png": {
+   "bytes": 188590,
+   "h": 512,
+   "sha256": "8507c854cb3004d7",
+   "w": 512
+  },
+  "art/icons/icon-64.png": {
+   "bytes": 5520,
+   "h": 64,
+   "sha256": "867db71823ce7cb0",
+   "w": 64
+  },
+  "art/icons/icon-96.png": {
+   "bytes": 10525,
+   "h": 96,
+   "sha256": "fd2a8457fd71e891",
+   "w": 96
+  },
+  "art/icons/icon-maskable-192.png": {
+   "bytes": 21072,
+   "h": 192,
+   "sha256": "27364e3fbbfdbb1e",
+   "w": 192
+  },
+  "art/icons/icon-maskable-512.png": {
+   "bytes": 103516,
+   "h": 512,
+   "sha256": "82b432dec775e276",
+   "w": 512
+  },
+  "art/og.png": {
+   "bytes": 259354,
+   "h": 630,
+   "sha256": "ffb66e71681dd8f2",
+   "w": 1200
+  },
+  "art/sprites/spark-64.png": {
+   "bytes": 2715,
+   "h": 64,
+   "sha256": "a3b82ca51d21f1e1",
+   "w": 64
+  },
+  "art/textures/plate-grain-256.png": {
+   "bytes": 61655,
+   "h": 256,
+   "sha256": "604df48ca45e9f71",
+   "w": 256
+  },
+  "favicon.ico": {
+   "bytes": 6348,
+   "h": 48,
+   "sha256": "e2b2e5e9b380da4c",
+   "w": 48
+  }
+ },
+ "geometry": {
+  "gap": 0.016,
+  "pad": 0.055,
+  "radius": 0.26
+ },
+ "lit": [
+  5,
+  6,
+  9,
+  10
+ ],
+ "motif": "lampgrid4",
+ "n": 4,
+ "palette": {
+  "accent": "78dcff",
+  "good": "6ee7b7",
+  "ink": "e6e9ef",
+  "lamp": "ffd35c"
+ },
+ "seed": 2063342
+}
