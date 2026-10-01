@@ -223,10 +223,10 @@ async function pointerScenario(cdp, sessionId, runJS) {
   // A 5×5 board, because every geometry row below recomputes the cross for n = 5 and the
   // headline rows click out a certified answer of par = 8. faint-06 is a 4×4 (see
   // js/data/lots.js), so opening it here tested a 4×4 board against 5×5 expectations.
-  await runJS(`window.lights.store.reset(); window.lights.go('#/lot/shadow-01'); 'ok'`);
+  await runJS(`window.lights.store.reset(); window.lights.help(false); window.lights.pause(false); window.lights.go('#/lot/shadow-01'); 'ok'`);
   await sleep(150);
 
-  const ids = await runJS(`['panel','undo','answer-key','restart','review','again','next','curtain','stars','shelf','wipe','readout','hintline','totals','about'].map((i) => [i, !!document.getElementById(i)])`);
+  const ids = await runJS(`['panel','undo','answer-key','restart','review','again','next','curtain','stars','shelf','wipe','readout','hintline','totals','about','pause','mute','fullscreen','help','help-card','help-close','help-start'].map((i) => [i, !!document.getElementById(i)])`);
   rec('every control the shell reaches for exists', ids.every(([, on]) => on), Object.fromEntries(ids));
 
   const open = await snap();
@@ -360,7 +360,7 @@ const HEAD = `
 // In-page suites. Each returns { rows: [{ test, pass, detail }] }.
 const SCENARIOS = {
   boot: `(async () => {${HEAD}
-    rec('the shell boots straight into a level', g && g.version === 1 && g.state.mode === 'campaign' && !!g.state.lot, g && g.summary());
+    rec('the shell boots straight into a level', g && g.version === 2 && g.state.mode === 'campaign' && !!g.state.lot, g && g.summary());
     const c = D('panel');
     rec('the canvas has real pixels', c.width > 0 && c.height > 0 && !!c.getContext('2d'), { w: c.width, h: c.height });
     const lit = (() => {

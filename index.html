@@ -36,6 +36,12 @@
     <button type="button" data-mode="campaign">关卡</button>
     <button type="button" data-mode="daily">每日</button>
   </nav>
+  <div class="hud" id="hud" aria-label="控制">
+    <button type="button" id="pause" aria-pressed="false" title="暂停 / 继续（P）">暂停</button>
+    <button type="button" id="mute" aria-pressed="false" title="静音（M）">静音</button>
+    <button type="button" id="fullscreen" aria-pressed="false" title="全屏（F）">全屏</button>
+    <button type="button" id="help" title="玩法说明（H）">玩法</button>
+  </div>
   <p class="totals" id="totals"></p>
 </header>
 
@@ -74,6 +80,36 @@
     </details>
   </aside>
 </main>
+
+<div class="help" id="help-card" role="dialog" aria-modal="true" aria-labelledby="help-title" hidden>
+  <div class="help-inner">
+    <h2 id="help-title">玩法：把最后那盏按熄</h2>
+    <ol class="help-rules">
+      <li>按下一格，它和它的<b>上下左右</b>一起翻转——亮的变暗，暗的变亮。边角只有两三个邻居，这不是 bug，是这道题的全部难度来源。</li>
+      <li>目标是<b>让所有灯熄灭</b>。</li>
+      <li>同一格按两次等于没按，但<b>算两次</b>。按过的格子留四个角标，随时可以再按一次撤掉。</li>
+      <li>每一关旁边那个「最少」不是估的：它由 GF(2) 陪集枚举算出，4×4 的全部 65536 个盘面还被按键图广度优先搜索逐个复核过。用那个次数收场，你就是最优解。</li>
+      <li>卡住了可以点「答案」把认证解叠在盘面上看；「重开」把这一关恢复到初始盘面，用时与火花一起清零。</li>
+    </ol>
+    <table class="help-keys">
+      <caption>键盘</caption>
+      <tbody>
+        <tr><th>Enter / Space</th><td>开始、继续；已通关时进下一关</td></tr>
+        <tr><th>P</th><td>暂停 / 继续（暂停期间不计时、不接受按键）</td></tr>
+        <tr><th>R</th><td>重开这一关</td></tr>
+        <tr><th>M</th><td>静音开关（真挂起音频上下文）</td></tr>
+        <tr><th>F</th><td>全屏</td></tr>
+        <tr><th>H 或 ?</th><td>打开 / 关闭本说明</td></tr>
+        <tr><th>Esc</th><td>关闭本说明</th></tr>
+        <tr><th>点击 / 触摸</th><td>直接按那一格</td></tr>
+      </tbody>
+    </table>
+    <div class="help-actions">
+      <button type="button" id="help-close">先看看盘面</button>
+      <button type="button" id="help-start" class="primary">开始熄灯</button>
+    </div>
+  </div>
+</div>
 
 <script type="module" src="js/main.js"></script>
 <script>

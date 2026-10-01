@@ -9,6 +9,8 @@ import { createGame, press, undo, reset, boardCells, litCount, grade, answerCell
 import { store, SAVE_KEY } from './core/storage.js';
 import { hashSeed, todayKey } from './core/rng.js';
 import { createView } from './view.js';
+import { createClock } from './clock.js';
+import { createAudio } from './audio.js';
 
 const dom = {
   canvas: document.getElementById('panel'),
@@ -31,9 +33,20 @@ const dom = {
   again: document.getElementById('again'),
   next: document.getElementById('next'),
   wipe: document.getElementById('wipe'),
+  pause: document.getElementById('pause'),
+  mute: document.getElementById('mute'),
+  fullscreen: document.getElementById('fullscreen'),
+  help: document.getElementById('help'),
+  helpCard: document.getElementById('help-card'),
+  helpClose: document.getElementById('help-close'),
+  helpStart: document.getElementById('help-start'),
 };
 
-const view = createView(dom.canvas);
+const prefersReducedMotion = typeof matchMedia === 'function'
+  && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const view = createView(dom.canvas, { reduceMotion: prefersReducedMotion });
+const audio = createAudio();
 
 const state = {
   mode: 'campaign',
@@ -42,7 +55,27 @@ const state = {
   game: null,
   showAnswer: false,
   missing: null,
+  paused: false,
+  helpOpen: false,
+  saveNote: null,
 };
+
+// HUD 上那个"用时"是 clock 的虚拟秒，不是 Date.now() 差值：暂停期间 clock 不推进，
+// 读出来的数就真的是"你想这件事想了多久"。DOM 只在整秒跳变时改文本，逐帧写
+// innerHTML 会让 readout 每帧重排一次。
+let hudSecond = -1;
+const clock = createClock({
+  onFrame: (dt, stamp) => {
+    view.step(dt, stamp);
+    const sec = Math.floor(clock.stats().elapsed);
+    if (sec !== hudSecond && !state.paused) {
+      hudSecond = sec;
+      renderTime();
+    }
+  },
+  // 回合制游戏不该让 rAF 空转：只有"还在解这一关"或"还有东西在动"时才要下一帧。
+  shouldRun: () => (state.game && !state.game.done && !state.paused && !state.helpOpen) || view.busy(),
+});
 
 // ---- routing ---------------------------------------------------------------
 
@@ -76,7 +109,19 @@ function loadLot(lot) {
   state.lot = lot;
   state.game = createGame(lot);
   state.showAnswer = false;
+  state.paused = false;
+  view.setPaused(false);
+  clock.setPaused(false);
+  view.resetFx();
+  clock.reset();
+  hudSecond = -1;
   paint();
+  clock.invalidate();
+}
+
+function formatClock(seconds) {
+  const s = Math.max(0, Math.floor(seconds));
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
 // The certified answer as cell indices: read off the baked key set, never searched for. Cached
@@ -121,11 +166,20 @@ function renderReadout() {
     ['par', '最少', String(lot.par), `陪集 ${2 ** lot.nullity} 个候选`, ''],
     ['lit', '还剩', String(litCount(game)), '盏亮着', game.done ? 'win' : 'lose'],
     ['best', '最佳', rec ? String(rec.best) : '—', rec ? `${rec.plays} 次通关` : '未挑战', ''],
+    ['time', '用时', formatClock(clock.stats().elapsed), state.paused ? '已暂停，不计入' : '想的时间', ''],
     ['stars', '评级', starsMarkup(g.stars), g.label, ''],
   ];
   dom.readout.innerHTML = rows.map(([key, label, value, note, klass]) =>
     `<div class="${key}" id="cell-${key}"><dt>${label}</dt><dd${klass ? ` class="${klass}"` : ''}>${value}</dd>`
     + `<small>${note}</small></div>`).join('');
+}
+
+// 每秒一次，只碰"用时"这一格：整块 readout 重建会把 hover 状态和布局一起打掉。
+function renderTime() {
+  const cell = dom.readout.querySelector('#cell-time');
+  if (!cell) return;
+  cell.querySelector('dd').textContent = formatClock(clock.stats().elapsed);
+  cell.querySelector('small').textContent = state.paused ? '已暂停，不计入' : '想的时间';
 }
 
 function renderCrumbs() {
@@ -158,6 +212,10 @@ function renderHint() {
     line += ` <span class="answer-line">答案：按 ${answerOf(lot).map((i) => i + 1).join('、')}</span>`;
   }
   if (state.mode === 'daily' && store.dailyDone(todayKey())) line += ' <span class="answer-line">今日已完成</span>';
+  if (state.saveNote) {
+    line += ` <span class="answer-line">${state.saveNote}</span>`;
+    state.saveNote = null;
+  }
   dom.hintline.innerHTML = line;
 }
 
@@ -226,13 +284,243 @@ function renderCurtain() {
   dom.curtain.hidden = false;
 }
 
+// ---- the controls that are not the puzzle ----------------------------------
+
+// 一次重开要复位的东西比看起来多：仿真时钟、粒子、余晖、暂停态、答案显示，以及
+// 缓存下来的"这一关按过哪些键"。少复位任何一样，下一局都会带着上一局的残留。
+function attemptReset({ countReset = true } = {}) {
+  if (!state.game) return;
+  if (countReset) store.noteReset();
+  reset(state.game);
+  state.showAnswer = false;
+  setPaused(false);
+  view.resetFx();
+  clock.reset();
+  hudSecond = -1;
+  paint();
+  clock.invalidate();
+}
+
+function setPaused(next) {
+  const want = !!next;
+  if (want === state.paused) return state.paused;
+  state.paused = want;
+  clock.setPaused(want);
+  view.setPaused(want);
+  if (want) audio.suspend();
+  else audio.resume();
+  paint();
+  return state.paused;
+}
+
+function toggleMute() {
+  const muted = audio.setMuted(!audio.isMuted());
+  store.setSetting('muted', muted);
+  syncButtons();
+  if (!muted) audio.play('ui');
+  return muted;
+}
+
+function fullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+
+// 全屏按钮是 HUD 上真实存在的 #fullscreen；iOS Safari 没有元素级 requestFullscreen，
+// 拿不到就退回"提示用户用系统手势"，而不是引用一个不存在的 id 假装按过了。
+function toggleFullscreen() {
+  const root = document.documentElement;
+  if (fullscreenElement()) {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if (exit) return Promise.resolve(exit.call(document)).catch(() => {});
+    return Promise.resolve();
+  }
+  const request = root.requestFullscreen || root.webkitRequestFullscreen || root.requestFullscreenWithOptions;
+  if (!request) {
+    dom.hintline.innerHTML = '<span class="answer-line">这个浏览器不支持网页全屏，请用系统的显示方式切换</span>';
+    return Promise.resolve();
+  }
+  return Promise.resolve(request.call(root)).catch(() => {});
+}
+
+function openHelp() {
+  state.helpOpen = true;
+  dom.helpCard.hidden = false;
+  setPaused(true);
+  clock.invalidate();
+}
+
+function closeHelp() {
+  state.helpOpen = false;
+  dom.helpCard.hidden = true;
+  store.setSetting('helpSeen', true);
+}
+
+function toggleHelp(force) {
+  const want = force === undefined ? !state.helpOpen : !!force;
+  if (want) openHelp();
+  else closeHelp();
+  return state.helpOpen;
+}
+
 function syncButtons() {
   const { game } = state;
   dom.undo.disabled = !game || game.back.length === 0 || game.done;
   dom.answerKey.textContent = state.showAnswer ? '收起答案' : '答案';
+  dom.pause.textContent = state.paused ? '继续' : '暂停';
+  dom.pause.setAttribute('aria-pressed', String(state.paused));
+  dom.mute.textContent = audio.isMuted() ? '已静音' : '静音';
+  dom.mute.setAttribute('aria-pressed', String(audio.isMuted()));
   for (const button of dom.modes.querySelectorAll('button')) {
     button.setAttribute('aria-current', String(button.dataset.mode === state.mode));
   }
+  syncFullscreenLabel();
+}
+
+function syncFullscreenLabel() {
+  if (!dom.fullscreen) return;
+  const on = !!fullscreenElement();
+  dom.fullscreen.textContent = on ? '退出全屏' : '全屏';
+  dom.fullscreen.setAttribute('aria-pressed', String(on));
+}
+
+// ---- wiring ----------------------------------------------------------------
+
+// 一套坐标换算，三种事件。pointerdown 是主路；不支持 pointer 事件的旧浏览器回落到
+// touchstart / mousedown。两条路都必须先减掉 getBoundingClientRect()，否则手机上 CSS
+// 缩放后的画布会点 A 打 B。
+function bindCanvas() {
+  const handle = (clientX, clientY) => {
+    const rect = dom.canvas.getBoundingClientRect();
+    const i = view.cellAt(clientX - rect.left, clientY - rect.top);
+    if (i >= 0) pressKey(i);
+  };
+  if (window.PointerEvent) {
+    dom.canvas.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      handle(event.clientX, event.clientY);
+    });
+    return;
+  }
+  dom.canvas.addEventListener('touchstart', (event) => {
+    if (!event.touches.length) return;
+    event.preventDefault();
+    handle(event.touches[0].clientX, event.touches[0].clientY);
+  }, { passive: false });
+  dom.canvas.addEventListener('mousedown', (event) => handle(event.clientX, event.clientY));
+}
+
+function bindKeys() {
+  addEventListener('keydown', (event) => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    const tag = event.target && event.target.tagName;
+    // 焦点在按钮上时 Space/Enter 是浏览器原生的"按下这个按钮"，抢过来会变成一次点击
+    // 加一次开局，所以这两个键只在焦点不在控件上时才归游戏。
+    const onControl = tag === 'BUTTON' || tag === 'A' || tag === 'INPUT' || tag === 'TEXTAREA';
+    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    if (key === 'Escape') {
+      if (state.helpOpen) { closeHelp(); setPaused(false); paint(); }
+      return;
+    }
+    if (state.helpOpen) {
+      if (key === 'Enter' || key === ' ' || key === 'h' || key === '?') {
+        event.preventDefault();
+        closeHelp();
+        setPaused(false);
+        paint();
+      }
+      return;
+    }
+    switch (key) {
+      case 'p':
+        event.preventDefault();
+        setPaused(!state.paused);
+        break;
+      case 'r':
+        event.preventDefault();
+        attemptReset();
+        break;
+      case 'm':
+        event.preventDefault();
+        toggleMute();
+        break;
+      case 'f':
+        event.preventDefault();
+        toggleFullscreen();
+        break;
+      case 'h':
+      case '?':
+        event.preventDefault();
+        toggleHelp(true);
+        break;
+      case 'Enter':
+      case ' ':
+        if (onControl) return;
+        event.preventDefault();
+        if (state.paused) setPaused(false);
+        else if (state.game && state.game.done) startNext();
+        else clock.invalidate();
+        break;
+      default:
+        break;
+    }
+  });
+}
+
+function bind() {
+  bindCanvas();
+  bindKeys();
+  for (const button of dom.modes.querySelectorAll('button')) {
+    button.addEventListener('click', () => go(button.dataset.mode === 'daily' ? '#/daily' : '#/'));
+  }
+  dom.shelf.addEventListener('click', (event) => {
+    const hit = event.target.closest('button');
+    if (!hit || hit.disabled) return;
+    if (hit.dataset.route) go(`#${hit.dataset.route}`);
+    else if (hit.dataset.id) go(`#/lot/${hit.dataset.id}`);
+  });
+  dom.undo.addEventListener('click', stepBack);
+  dom.answerKey.addEventListener('click', () => {
+    state.showAnswer = !state.showAnswer;
+    audio.play('ui');
+    paint();
+  });
+  dom.restart.addEventListener('click', () => attemptReset());
+  dom.pause.addEventListener('click', () => setPaused(!state.paused));
+  dom.mute.addEventListener('click', toggleMute);
+  dom.fullscreen.addEventListener('click', toggleFullscreen);
+  dom.help.addEventListener('click', () => toggleHelp(true));
+  dom.helpClose.addEventListener('click', () => { closeHelp(); setPaused(false); paint(); });
+  dom.helpStart.addEventListener('click', () => { closeHelp(); setPaused(false); paint(); });
+  dom.review.addEventListener('click', () => {
+    dom.answer.hidden = !dom.answer.hidden;
+  });
+  dom.again.addEventListener('click', () => attemptReset({ countReset: false }));
+  dom.next.addEventListener('click', startNext);
+  dom.wipe.addEventListener('click', () => {
+    store.reset();
+    // 清完要读回来再说"清好了"：reset() 走的是同一条带守卫的路径，浏览器拒绝存储时它只
+    // 能清掉本进程的内存，那时候"这台设备已忘记"是一句假话。
+    const left = store.rawBytes();
+    state.saveNote = left === null
+      ? (store.persistent ? '存档已清空，这台设备回到第 1 关' : '这个浏览器不允许保存（隐身模式或以文件方式打开），刚才只清掉了本次会话')
+      : `存档没清掉：盘上还剩 ${left.length} 字节`;
+    audio.setMuted(false);
+    paint();
+  });
+  addEventListener('hashchange', () => mount(routeFromLocation()));
+  addEventListener('resize', () => { view.resize(); clock.invalidate(); });
+  addEventListener('fullscreenchange', syncFullscreenLabel);
+  addEventListener('webkitfullscreenchange', syncFullscreenLabel);
+  // 切后台等于离开这件事：计时不该把"回邮件的两分钟"算进本关用时。
+  addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      setPaused(true);
+      audio.suspend();
+    } else {
+      audio.resume();
+      clock.invalidate();
+    }
+  });
 }
 
 function drawBoard() {
@@ -264,30 +552,38 @@ function paint() {
 
 function settle() {
   const { lot, game } = state;
-  const rec = store.solve(lot.id, { presses: game.presses, par: lot.par });
+  const rec = store.solve(lot.id, { presses: game.presses, par: lot.par, seconds: clock.stats().elapsed });
   const index = campaignIds().indexOf(lot.id);
   if (index >= 0) store.unlock(index + 2);
   if (state.mode === 'daily') store.markDaily(todayKey(), lot.id);
+  audio.play('win');
   return rec;
 }
 
 function pressKey(j) {
   const { game } = state;
   if (!game || game.done) return false;
+  // 暂停不是只把画面盖住：仿真、计时和输入在这一态下全部不推进。
+  if (state.paused || state.helpOpen) {
+    audio.play('deny');
+    return false;
+  }
   const before = boardCells(game);
   if (press(game, j) === null) return false;
   const after = boardCells(game);
   const changed = [];
   for (let i = 0; i < after.length; i++) if (after[i] !== before[i]) changed.push(i);
-  view.flash(changed);
+  view.flash(changed, clock.stats().lastStamp);
+  audio.play(after[j] ? 'press' : 'off');
   if (game.done) settle();
   paint();
   return true;
 }
 
 function stepBack() {
-  if (!state.game) return;
+  if (!state.game || state.paused || state.helpOpen) return;
   if (!undo(state.game)) return;
+  audio.play('ui');
   paint();
 }
 
@@ -339,63 +635,12 @@ function go(hash) {
   else location.hash = hash;
 }
 
-// ---- wiring ----------------------------------------------------------------
-
-function bind() {
-  dom.canvas.addEventListener('pointerdown', (event) => {
-    event.preventDefault();
-    const rect = dom.canvas.getBoundingClientRect();
-    const i = view.cellAt(event.clientX - rect.left, event.clientY - rect.top);
-    if (i >= 0) pressKey(i);
-  });
-  for (const button of dom.modes.querySelectorAll('button')) {
-    button.addEventListener('click', () => go(button.dataset.mode === 'daily' ? '#/daily' : '#/'));
-  }
-  dom.shelf.addEventListener('click', (event) => {
-    const hit = event.target.closest('button');
-    if (!hit || hit.disabled) return;
-    if (hit.dataset.route) go(`#${hit.dataset.route}`);
-    else if (hit.dataset.id) go(`#/lot/${hit.dataset.id}`);
-  });
-  dom.undo.addEventListener('click', stepBack);
-  dom.answerKey.addEventListener('click', () => {
-    state.showAnswer = !state.showAnswer;
-    paint();
-  });
-  dom.restart.addEventListener('click', () => {
-    store.noteReset();
-    reset(state.game);
-    state.showAnswer = false;
-    paint();
-  });
-  dom.review.addEventListener('click', () => {
-    dom.answer.hidden = !dom.answer.hidden;
-  });
-  dom.again.addEventListener('click', () => {
-    reset(state.game);
-    paint();
-  });
-  dom.next.addEventListener('click', startNext);
-  dom.wipe.addEventListener('click', () => {
-    store.reset();
-    // The store's own wipe is the honest path; this one is here so the button still means
-    // "forget this device" when a browser refuses the API and the memory cache was all there was.
-    try {
-      globalThis.localStorage.removeItem(SAVE_KEY);
-    } catch (err) {
-      /* nothing persisted, so nothing to clear */
-    }
-    paint();
-  });
-  addEventListener('hashchange', () => mount(routeFromLocation()));
-  addEventListener('resize', () => view.resize());
-}
-
-// A handle for tools/playtest.mjs: enough to drive a puzzle and read the board back. The browser
-// assertions never go through here to decide what is true — presses come from real mouse events,
-// and the difficulty numbers come from the baked file. This reports state and route.
+// A handle for tools/playtest.mjs, the browser assertions and the frame-rate harness: enough to
+// drive a puzzle and read the board back. The browser assertions never go through here to decide
+// what is true — presses come from real mouse events, and the difficulty numbers come from the
+// baked file. This reports state and route.
 window.lights = {
-  version: 1,
+  version: 2,
   state,
   view,
   dom,
@@ -409,10 +654,14 @@ window.lights = {
   press: pressKey,
   play: (list) => list.map((j) => pressKey(j)),
   undo: stepBack,
-  reset: () => {
-    reset(state.game);
-    paint();
-  },
+  reset: () => attemptReset({ countReset: false }),
+  restart: () => attemptReset(),
+  pause: setPaused,
+  mute: toggleMute,
+  fullscreen: toggleFullscreen,
+  help: toggleHelp,
+  clock,
+  audio: () => audio.status(),
   layout: () => view.layout(),
   cellCenter: (i) => view.cellCenter(i),
   cellRect: (i) => view.cellRect(i),
@@ -434,6 +683,13 @@ window.lights = {
     done: state.game ? state.game.done : null,
     cursor: state.cursor,
     missing: state.missing,
+    paused: state.paused,
+    helpOpen: state.helpOpen,
+    muted: audio.isMuted(),
+    seconds: clock.stats().elapsed,
+    frames: clock.stats().frames,
+    fx: view.debug(),
+    audio: audio.status(),
     unlocked: store.unlocked,
     plays: store.stats.solves,
     totals: dom.totals.textContent,
@@ -445,4 +701,9 @@ window.lights = {
 
 bind();
 view.start();
+// 静音偏好跟着设备走，教学只在第一次弹：一个已经知道自己要什么的玩家不该每次开
+// 都要多点一下"知道了"。
+audio.setMuted(!!store.settings.muted);
 mount(routeFromLocation());
+if (!store.settings.helpSeen) toggleHelp(true);
+clock.start();

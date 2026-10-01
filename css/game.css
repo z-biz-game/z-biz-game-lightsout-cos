@@ -29,10 +29,11 @@ body {
 }
 button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
 
-.topbar { display: flex; align-items: center; gap: 18px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+.topbar { display: flex; align-items: center; gap: 18px; padding: calc(12px + env(safe-area-inset-top, 0px)) calc(18px + env(safe-area-inset-right, 0px)) 12px calc(18px + env(safe-area-inset-left, 0px)); border-bottom: 1px solid var(--line); }
 .brand { font-size: 16px; letter-spacing: 0.06em; display: flex; align-items: baseline; gap: 8px; font-weight: 600; }
 .brand small { color: var(--ink-dim); font-size: 10px; letter-spacing: 0.28em; }
-.brand-mark { color: var(--lamp); }
+.brand-mark { color: var(--lamp); animation: lamp-breathe 3.2s ease-in-out infinite; }
+@keyframes lamp-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 .modes { display: flex; gap: 4px; }
 .modes button { padding: 6px 14px; font-size: 13px; color: var(--ink-dim); border: 1px solid transparent; border-radius: 6px; }
 .modes button:hover { color: var(--ink); background: rgba(255, 255, 255, 0.04); }
@@ -111,4 +112,58 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   .board { height: 56vh; min-height: 320px; }
   .topbar { flex-wrap: wrap; gap: 10px; }
   .totals { margin-left: 0; width: 100%; }
+}
+
+/* ---- HUD、命中区、安全区、减动效 ------------------------------------------------
+   这一段是"卖相"和"手感"的底线，不是装饰：
+   - 44px 是 Apple HIG 与 Material 的最小可点边长，拇指按 34px 的格子会按错；
+   - env(safe-area-inset-*) 只有在 viewport-fit=cover 下才非零，两者要一起看；
+   - prefers-reduced-motion 关掉呼吸灯与过渡，画面退化成静图，语义一个像素都不少。 */
+
+.hud { display: flex; gap: 6px; margin-left: auto; }
+.hud button { min-height: 44px; min-width: 44px; padding: 0 12px; font-size: 12px; color: var(--ink-dim);
+  border: 1px solid var(--line); border-radius: 9px; background: rgba(255, 255, 255, 0.03); }
+.hud button:hover { color: var(--lamp); border-color: rgba(255, 211, 92, 0.5); }
+.hud button[aria-pressed="true"] { color: var(--lamp); border-color: rgba(255, 211, 92, 0.55); background: rgba(255, 211, 92, 0.1); }
+.totals { margin-left: 18px; }
+
+/* 所有可点的东西一律够拇指：模式切换、控制三键、曲库格子、结算三键、清空存档、说明按钮。 */
+.modes button, .controls button, .shelf button, .curtain-actions button, .help-actions button, .about #wipe {
+  min-height: 44px; min-width: 44px;
+}
+.shelf button { padding: 0 8px; }
+.modes button { padding: 0 14px; }
+
+.stage { padding: 18px calc(18px + env(safe-area-inset-right, 0px)) calc(18px + env(safe-area-inset-bottom, 0px)) calc(18px + env(safe-area-inset-left, 0px)); }
+.panel { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+
+.help { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; overflow: auto;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) calc(20px + env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) calc(20px + env(safe-area-inset-left, 0px));
+  background: rgba(6, 8, 11, 0.86); backdrop-filter: blur(4px); }
+.help[hidden] { display: none; }
+.help-inner { width: min(620px, 100%); border: 1px solid rgba(255, 211, 92, 0.35); border-radius: 14px;
+  background: var(--panel); padding: 24px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5); }
+.help-inner h2 { font-size: 19px; margin-bottom: 14px; color: var(--lamp); }
+.help-rules { margin: 0 0 18px 20px; font-size: 13px; line-height: 1.9; color: var(--ink); }
+.help-rules b { color: var(--accent); }
+.help-keys { width: 100%; border-collapse: collapse; font-size: 12px; }
+.help-keys caption { text-align: left; color: var(--ink-dim); letter-spacing: 0.14em; margin-bottom: 6px; }
+.help-keys th, .help-keys td { border-top: 1px solid var(--line); padding: 8px 6px; text-align: left; }
+.help-keys th { color: var(--lamp); font-weight: 600; white-space: nowrap; width: 34%; }
+.help-keys td { color: var(--ink-dim); }
+.help-actions { display: flex; gap: 10px; margin-top: 20px; }
+.help-actions button { flex: 1; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); }
+.help-actions .primary { border-color: rgba(255, 211, 92, 0.6); color: var(--lamp); background: rgba(255, 211, 92, 0.1); }
+
+@media (max-width: 820px) {
+  .stage { padding: 14px calc(14px + env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) calc(14px + env(safe-area-inset-left, 0px)); }
+  .hud { margin-left: 0; width: 100%; }
+  .hud button { flex: 1; }
+  .totals { margin-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-mark { animation: none; opacity: 1; }
+  * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  .curtain, .help { backdrop-filter: none; }
 }
