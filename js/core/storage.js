@@ -6,6 +6,16 @@
 // throw QuotaExceededError at any time. So every access goes through `backend()`, which
 // treats a throw as "no persistent store" and keeps the session in memory. Under node there
 // is no localStorage at all, which is what lets test/storage.test.mjs drive the same module.
+//
+// Decoding is two-stage on purpose, and the two stages fail differently:
+//   stage 1 — parse. A save that is not JSON at all is a corrupt file; there is nothing to
+//             keep, so it becomes a blank save.
+//   stage 2 — validate, one entry at a time. A single bad record (someone hand-edited it, an
+//             older build wrote a different shape, a bookmarklet put nonsense under the key)
+//             must cost that one record and nothing else. The first version of this module did
+//             `Object.assign(blank(), JSON.parse(raw))`, which meant one `null` record threw in
+//             the middle of a getter and the whole shell rendered as an empty board — the save
+//             file became a way to lose the game.
 
 export const SAVE_KEY = 'lightsout.save.v1';
 
@@ -13,6 +23,7 @@ function blank() {
   return {
     records: {},
     daily: {},
+    settings: {},
     unlocked: 1,
     stats: { solves: 0, perfect: 0, presses: 0, resets: 0 },
   };
@@ -33,19 +44,116 @@ function backend() {
   return null;
 }
 
-// The real back end is the browser's localStorage; both paths are wrapped so that a throw
-// is a fallback rather than a crash.
-function api(store) {
+// The real back end is the browser's localStorage. The three operations call the facade
+// directly — `globalThis.localStorage.getItem(...)`, not a captured reference — because the
+// property access is the thing a denying browser throws on, and a read-back has to mean "what
+// the browser actually holds right now", not "what this module remembered holding earlier".
+function api() {
   return {
-    getItem: (k) => store.getItem(k),
-    setItem: (k, v) => store.setItem(k, v),
-    removeItem: (k) => store.removeItem(k),
+    getItem: (k) => globalThis.localStorage.getItem(k),
+    setItem: (k, v) => globalThis.localStorage.setItem(k, v),
+    removeItem: (k) => globalThis.localStorage.removeItem(k),
   };
 }
 
 function current() {
-  const ls = backend();
-  return ls ? api(ls) : null;
+  return backend() ? api() : null;
+}
+
+// ---- stage 2 validators ----------------------------------------------------
+
+function plainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function count(value, max = Number.MAX_SAFE_INTEGER) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.min(max, Math.floor(n));
+}
+
+// One record: `best` has to be a real press count and `plays` a real number of runs, because
+// both are printed as numbers and `best` is compared against the certified par. Anything else
+// is dropped — by the record, not by the file.
+function decodeRecord(raw) {
+  if (!plainObject(raw)) return null;
+  const best = count(raw.best);
+  if (best === null || best < 1) return null;
+  const plays = count(raw.plays);
+  if (plays === null) return null;
+  const out = {
+    solved: raw.solved === false ? false : true,
+    best,
+    plays: Math.max(1, plays),
+    perfect: !!raw.perfect,
+  };
+  const seconds = count(raw.seconds);
+  if (seconds !== null) out.seconds = seconds;
+  return out;
+}
+
+function decodeDailyEntry(raw) {
+  if (typeof raw === 'string') return raw ? { id: raw, at: 0 } : null;
+  if (!plainObject(raw)) return null;
+  if (typeof raw.id !== 'string' || !raw.id) return null;
+  const at = count(raw.at);
+  return { id: raw.id, at: at === null ? 0 : at };
+}
+
+function decodeRecords(raw) {
+  const out = {};
+  if (!plainObject(raw)) return out;
+  for (const key of Object.keys(raw)) {
+    const rec = decodeRecord(raw[key]);
+    if (rec) out[key] = rec;
+  }
+  return out;
+}
+
+function decodeDaily(raw) {
+  const out = {};
+  if (!plainObject(raw)) return out;
+  for (const key of Object.keys(raw)) {
+    const day = decodeDailyEntry(raw[key]);
+    if (day) out[key] = day;
+  }
+  return out;
+}
+
+function decodeStats(raw) {
+  const base = blank().stats;
+  if (!plainObject(raw)) return base;
+  // Unknown fields ride along: a future build's counter must not be erased by an older one
+  // reading the file, which is the whole point of the "future shape" test.
+  const out = { ...base, ...raw };
+  for (const key of Object.keys(base)) {
+    const n = count(raw[key]);
+    out[key] = n === null ? base[key] : n;
+  }
+  for (const key of Object.keys(out)) {
+    if (!Number.isFinite(Number(out[key])) || Number(out[key]) < 0) delete out[key];
+  }
+  return out;
+}
+
+function decodeSettings(raw) {
+  const out = {};
+  if (!plainObject(raw)) return out;
+  if (typeof raw.muted === 'boolean') out.muted = raw.muted;
+  if (typeof raw.helpSeen === 'boolean') out.helpSeen = raw.helpSeen;
+  return out;
+}
+
+function decode(parsed) {
+  if (!plainObject(parsed)) return blank();
+  const unlocked = count(parsed.unlocked);
+  return {
+    records: decodeRecords(parsed.records),
+    daily: decodeDaily(parsed.daily),
+    settings: decodeSettings(parsed.settings),
+    unlocked: unlocked === null || unlocked < 1 ? 1 : Math.max(1, Math.floor(unlocked)),
+    stats: decodeStats(parsed.stats),
+  };
 }
 
 function load() {
@@ -61,17 +169,8 @@ function load() {
   }
   if (raw) {
     try {
-      const p = JSON.parse(raw);
-      if (p && typeof p === 'object') {
-        const base = blank();
-        cache = {
-          records: p.records && typeof p.records === 'object' ? p.records : base.records,
-          daily: p.daily && typeof p.daily === 'object' ? p.daily : base.daily,
-          unlocked: Number(p.unlocked) > 0 ? Number(p.unlocked) : base.unlocked,
-          stats: { ...base.stats, ...(p.stats || {}) },
-        };
-        return cache;
-      }
+      cache = decode(JSON.parse(raw));
+      return cache;
     } catch (err) {
       // A corrupt save is not worth keeping; start clean rather than crash the shell.
     }
@@ -96,8 +195,20 @@ export const store = {
   get records() { return load().records; },
   get stats() { return load().stats; },
   get daily() { return load().daily; },
+  get settings() { return load().settings; },
   get unlocked() { return load().unlocked; },
   get persistent() { return !!current(); },
+  // 盘上现在到底有没有这些字节：写完读回来自检，清空之后也用它确认真的没了，
+  // 而不是相信本进程的缓存。浏览器拒绝存储时返回 null，不返回假数据。
+  rawBytes() {
+    const s = current();
+    if (!s) return null;
+    try {
+      return s.getItem(SAVE_KEY);
+    } catch (err) {
+      return null;
+    }
+  },
 
   record(id) {
     return load().records[id] || null;
@@ -122,22 +233,36 @@ export const store = {
   },
 
   // `par` is the certified coset minimum, so "perfect" is a fact about the board rather
-  // than a feeling: you matched the enumeration.
-  solve(id, { presses, par }) {
+  // than a feeling: you matched the enumeration. `seconds` is the frozen session clock at
+  // the moment the board went dark, and only ever goes down alongside `best`.
+  solve(id, { presses, par, seconds }) {
     const s = load();
-    const prev = s.records[id];
+    const prev = decodeRecord(s.records[id]) || null;
     const cur = {
       solved: true,
       best: !prev || !prev.best || presses < prev.best ? presses : prev.best,
       plays: (prev && prev.plays ? prev.plays : 0) + 1,
       perfect: presses <= par || !!(prev && prev.perfect),
     };
+    const took = count(seconds);
+    if (took !== null) {
+      // 用时跟着最好那一局：这一趟按得更多，就不拿它覆盖纪录的时间。
+      const keepsPrev = prev && prev.seconds !== undefined && presses > prev.best;
+      cur.seconds = keepsPrev ? prev.seconds : took;
+    }
     s.records[id] = cur;
     s.stats.solves += 1;
     s.stats.presses += presses;
     if (presses <= par) s.stats.perfect += 1;
     persist();
     return cur;
+  },
+
+  setSetting(key, value) {
+    const s = load();
+    s.settings[key] = value;
+    persist();
+    return value;
   },
 
   noteReset() {

@@ -183,4 +183,73 @@ test('the key is versioned, so a shape change cannot be misread', () => {
   ok(/\.v\d+$/.test(SAVE_KEY), 'and the version suffix is there to bump');
 });
 
+test('one bad record costs that record only — four poisons in one save', () => {
+  const fake = fakeStore();
+  const poisoned = JSON.stringify({
+    records: {
+      'null-01': null,
+      'nofield-01': { solved: true, best: 4, perfect: true },
+      'wrongtype-01': { solved: true, best: 'wide', plays: 2, perfect: false },
+      'range-01': { solved: true, best: -5, plays: 2, perfect: false },
+      'good-01': { solved: true, best: 6, plays: 3, perfect: true, seconds: 41 },
+    },
+    daily: {
+      '2026-09-27': { id: 'good-01', at: 5 },
+      '2026-09-28': { at: 5 },
+      '2026-09-29': 17,
+    },
+    settings: { muted: true, helpSeen: 'yes', bogus: 1 },
+    unlocked: 3,
+    stats: { solves: 3, perfect: 1, presses: 'many', resets: 2, hints: 7 },
+  });
+  withLocalStorage({ get: () => fake }, () => {
+    store.reset();
+    fake.map.set(SAVE_KEY, poisoned);
+    eq(Object.keys(store.records), ['good-01'], 'the four poisons are each dropped by their own record');
+    eq(store.record('good-01'), { solved: true, best: 6, plays: 3, perfect: true, seconds: 41 });
+    eq(store.record('null-01'), null, 'and a dropped level reads as never played');
+    eq(store.unlocked, 3, 'unlocked is not infected by them');
+    eq(store.stats.solves, 3);
+    eq(store.stats.perfect, 1);
+    eq(store.stats.resets, 2);
+    eq(store.stats.hints, 7, 'a stat this build does not know still rides along');
+    eq(store.stats.presses, 0, 'a poisoned stat alone falls back to the blank value');
+    eq(Object.keys(store.dailyDone('2026-09-27')), ['id', 'at'], 'the healthy day survives');
+    eq([store.dailyDone('2026-09-28'), store.dailyDone('2026-09-29')], [null, null], 'the poisoned days do not');
+    eq([store.settings.muted, store.settings.helpSeen, store.settings.bogus], [true, undefined, undefined],
+      'only settings of the declared type are believed');
+    // The next write must persist the clean shape, or the garbage comes back on every reload.
+    store.solve('good-01', { presses: 5, par: 5, seconds: 33 });
+    const again = JSON.parse(fake.map.get(SAVE_KEY));
+    eq(Object.keys(again.records), ['good-01'], 'the rewritten save holds only the healthy record');
+    eq([again.records['good-01'].best, again.records['good-01'].plays], [5, 4], 'and the new run improved on it');
+    eq(Object.keys(again.daily), ['2026-09-27']);
+    eq(again.settings, { muted: true });
+  });
+});
+
+test('rawBytes reads back what the browser really holds', () => {
+  const fake = fakeStore();
+  withLocalStorage({ get: () => fake }, () => {
+    store.reset();
+    eq(store.rawBytes(), null, 'a fresh device has no save at all');
+    store.solve('raw-01', { presses: 3, par: 3 });
+    const bytes = store.rawBytes();
+    ok(typeof bytes === 'string' && bytes.length > 0, 'after a run there are bytes');
+    eq(JSON.parse(bytes).records['raw-01'].best, 3, 'and they are the bytes a reader would parse');
+    eq(store.reset(), true);
+    eq(store.rawBytes(), null, 'the wipe is confirmed by reading, not by remembering');
+  });
+  withLocalStorage({ get: () => fakeStore({ getItem() { throw new Error('denied'); } }) }, () => {
+    store.reset();
+    eq(store.rawBytes(), null, 'a throwing read is no bytes, not a crash');
+  });
+  withLocalStorage(null, () => {
+    store.reset();
+    store.solve('raw-02', { presses: 4, par: 4 });
+    eq(store.rawBytes(), null, 'memory-only sessions have nothing on disk');
+    eq(store.record('raw-02').best, 4, 'but the session record is still real');
+  });
+});
+
 run();
