@@ -286,6 +286,19 @@ KNIVES = [
      [('README.md', 'tools/sabotage.py', 'tools/没有这个文件.py', 7)],
      [GATE],
      WIRE),
+
+    # ---- D13 那一组钉的是"门也在家门口"。这两把刀各回答一个问题：
+    # 钉被悄悄改小会不会红（L30）、调用被摘掉会不会红（L31）。
+    ('L30', 'verify.sh 的 LOGIC_EXPECTS 把 doctest 那一项钉小 2',
+     [('tools/verify.sh', 'LOGIC_EXPECTS="doctest:52 sabotage:31"',
+       'LOGIC_EXPECTS="doctest:50 sabotage:31"', 1)],
+     [GATE],
+     'D13b verify.sh 钉的 doctest 项数等于本闸实跑的项数（增删一条断言要两处一起走）'),
+
+    ('L31', '摘掉 verify.sh 里跑 doctest 的那一行调用（门只在 CI 里跑）',
+     [('tools/verify.sh', 'node "$HERE/tools/doctest.mjs" >"$LLOG" 2>&1\n', '', 1)],
+     [GATE],
+     'D13d 三道逻辑闸在 verify.sh 里各有一条真调用（注释里提到路径不算调用）'),
 ]
 
 

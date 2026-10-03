@@ -308,6 +308,48 @@ ok(Object.values(sabWires).every(Boolean),
   'D12 台账与文档闸都接进了 CI 和 package.json，而且接线自己有一把刀（砍掉任何一处它就只是一段代码）',
   Object.entries(sabWires).map(([k, v]) => `${k}=${v ? '在' : '缺'}`).join(' · ') + (SAB ? '' : ' · 台架文件不在树里'));
 
+// ---- D13 家门口的门：verify.sh 必须跑这三道逻辑闸，而且钉的条数与实跑一致 ----
+// 补的是「门只在 CI 里跑」这个缺陷：CI 的 unit job 有 node 套件、文档闸、台账三步，
+// 而本地那道 one-shot 以前一步都不跑——改闸的人在自己机器上看见的绿，是另一套。
+// 先数解析到几颗钉：读不到那一行时，后面三条都会变成"什么都不比较"的空转绿。
+const pinBlock = (VERIFY.match(/^\s*LOGIC_EXPECTS="([^"]+)"/m) || [])[1] || '';
+const pins = Object.fromEntries(pinBlock.split(/\s+/).filter(Boolean).map((kv) => kv.split(':')));
+ok(Object.keys(pins).length === 2 && !!pins.doctest && !!pins.sabotage,
+  'D13a verify.sh 的 LOGIC_EXPECTS 解析到且只解析到两颗钉（doctest 与 sabotage）',
+  pinBlock || 'verify.sh 里没有 LOGIC_EXPECTS 那一行');
+// 钉的是"别人家的数"：一颗钉漂了，另一颗照样绿，所以两边各比一次。
+const knives = rigKnives.length;
+ok(!!pins.sabotage && +pins.sabotage === knives,
+  'D13c verify.sh 钉的刀数等于台架源码现数的刀数（加一把刀要两处一起走）',
+  `钉 ${pins.sabotage || '无'} · 现数 ${knives}`);
+// D13b、D13d、D13e 各是本闸的一项，它们排在下面这三段里。
+const finalRows = rows + 3;
+ok(!!pins.doctest && +pins.doctest === finalRows,
+  'D13b verify.sh 钉的 doctest 项数等于本闸实跑的项数（增删一条断言要两处一起走）',
+  `钉 ${pins.doctest || '无'} · 实跑 ${finalRows}`);
+// 调用要能在**非注释行**上数出来：README 里、注释里提一句路径不等于真的调了。
+// 先剥缩进（这几条调用住在 `if` 块里），再剥行首的环境变量赋值（`FOO=1 python3 …` 那种）。
+const cmds = VERIFY.split('\n').filter((l) => !/^\s*#/.test(l))
+  .map((l) => l.replace(/^\s+/, '').replace(/^(?:[A-Z][A-Z0-9_]*=\S*\s+)+/, ''));
+const trio = [
+  ['node 套件', (l) => /^for f in test\/\*\.test\.mjs/.test(l)],
+  ['doctest', (l) => /^node\s/.test(l) && l.includes('tools/doctest.mjs')],
+  ['sabotage', (l) => /^python3\s/.test(l) && l.includes('tools/sabotage.py')],
+];
+const hits = trio.map(([, p]) => cmds.filter(p).length);
+ok(hits.every((n) => n >= 1),
+  'D13d 三道逻辑闸在 verify.sh 里各有一条真调用（注释里提到路径不算调用）',
+  trio.map(([n], i) => `${n}=${hits[i]}`).join(' · '));
+// README 那两个抄来的文档闸读数：一个是本闸裸跑的项数，另一个是加上 --measured 的项数。
+// 加出来的那 6 行不手抄：它由 D5d 那一条加每条腿各一条比出来，腿数已经被 D5a 钉成 5。
+const measuredExtra = 1 + legNames.length;
+const docReadings = /本轮读数 \*\*`rows: (\d+) fail: 0`\*\*[\s\S]{0,200}?是 \*\*`rows: (\d+) fail: 0`\*\*[\s\S]{0,40}?多出来的 (\d+) 行/.exec(README);
+ok(!!docReadings && +docReadings[1] === finalRows && +docReadings[2] === finalRows + measuredExtra
+  && +docReadings[3] === measuredExtra,
+  'D13e README 抄的两个文档闸读数等于本闸实跑项数与它加上 --measured 之后的项数',
+  docReadings ? `裸跑 ${docReadings[1]}（实跑 ${finalRows}）· measured ${docReadings[2]}（应为 ${finalRows + measuredExtra}）· 差 ${docReadings[3]}（现算 ${measuredExtra}）`
+    : '那一句解析不到三个数（改写了句子就要改这里，否则这两个数没人对账）');
+
 console.log(`\n合计 ${rows} 项，${fail.length} 项失败`);
 console.log(`rows: ${rows} fail: ${fail.length}`);
 if (fail.length) {
