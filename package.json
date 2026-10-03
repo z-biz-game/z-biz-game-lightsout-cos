@@ -14,7 +14,9 @@
     "test": "npm run check && npm run unit",
     "verify": "bash tools/verify.sh",
     "doctest": "node tools/doctest.mjs",
-    "sabotage": "python3 tools/sabotage.py"
+    "sabotage": "python3 tools/sabotage.py",
+    "deploy-set": "node tools/deploy-set.mjs",
+    "deploy-set:selftest": "node tools/deploy-set-selftest.mjs"
   },
   "keywords": [
     "game",
@@ -33,8 +35,14 @@
   "build": {
     "appId": "com.zbiz.lightsout",
     "productName": "Lightsout",
-    "mac": { "category": "public.app-category.puzzle-games" },
-    "win": { "target": "nsis" },
-    "linux": { "target": "AppImage" }
+    "mac": {
+      "category": "public.app-category.puzzle-games"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   }
 }
