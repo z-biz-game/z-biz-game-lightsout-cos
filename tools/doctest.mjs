@@ -221,11 +221,14 @@ ok(!!urlDoc && urlDoc[1] === basename(ROOT),
   `文档 ${urlDoc && urlDoc[1]} vs 目录 ${basename(ROOT)}`);
 
 // ---- D7 脚本清单：文档那张表里的 script 名 == package.json 的键 ----
+// 名字里允许 . 和 -：npm 的合法 script 名就带这两个字符（deploy-set:selftest），
+// 只写 [\w:] 会让带连字符的行在文档里数不出来，于是「文档覆盖每一条 script」这条钉对新加的
+// 那条命令永远红——覆盖要求一条没松，只是名册以前抄窄了。
 const scriptRows = tableByHeader('| script | 命令 | 本轮状态 |');
-const docScripts = [...new Set(scriptRows.flatMap((c) => [...c[0].matchAll(/`([\w:]+)`/g)].map((x) => x[1])))];
+const docScripts = [...new Set(scriptRows.flatMap((c) => [...c[0].matchAll(/`([\w:.-]+)`/g)].map((x) => x[1])))];
 const realScripts = Object.keys(PKG.scripts);
 // 允许一行写两条（`\`start\` / \`dev\``），但合并数要当场数出来，不许拿"行对不上"当借口。
-const merged = scriptRows.filter((c) => [...c[0].matchAll(/`([\w:]+)`/g)].length > 1).length;
+const merged = scriptRows.filter((c) => [...c[0].matchAll(/`([\w:.-]+)`/g)].length > 1).length;
 ok(scriptRows.length > 0 && scriptRows.length + merged === realScripts.length &&
     docScripts.sort().join(',') === [...realScripts].sort().join(','),
   'D7 文档脚本表覆盖 package.json 的每一条（多一条少一条都红）',
