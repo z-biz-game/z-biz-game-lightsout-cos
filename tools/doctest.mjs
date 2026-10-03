@@ -285,14 +285,17 @@ ok(LS.status === 0 && trackedCount > 0 && !!docTracked && +docTracked[1] === tra
   `文档 ${docTracked && docTracked[1]} vs git ${trackedCount}（rc=${LS.status}）`);
 
 // ---- D11 台账刀数：文档那张逐枪表的行号集合 == tools/sabotage.py 的 KNIVES ----
+// 散文里那句"共 N 把"也一起比：只补表不改散文（或反过来）都是一半人在说另一半没说的话。
 const docKnives = [...README.matchAll(/^\| (L\d+) \| /gm)].map((m) => m[1]);
 const rigKnives = [...SAB.matchAll(/^\s{4}\('(L\d+)'/gm)].map((m) => m[1]);
+const proseKnives = [...new Set([...README.matchAll(/共 \*\*(\d+) 把\*\*/g)].map((m) => m[1]))];
 ok(docKnives.length > 0 && rigKnives.length > 0,
   'D11a 台账两边都解析到了刀号（解析不到就别充绿）',
   `文档 ${docKnives.length} 行、台架 ${rigKnives.length} 把${SAB ? '' : '（台架文件不在树里）'}`);
-ok(docKnives.join(',') === rigKnives.join(','),
-  'D11 文档逐枪表的每一把刀都在台架里，台架的每一把都写进了文档',
-  `文档 ${docKnives.join(' ')} vs 台架 ${rigKnives.join(' ')}`);
+ok(docKnives.join(',') === rigKnives.join(',') && proseKnives.length === 1
+  && +proseKnives[0] === rigKnives.length,
+  'D11 文档逐枪表的每一把刀都在台架里，台架的每一把都写进了文档，散文那句"共 N 把"是同一个数',
+  `文档 ${docKnives.join(' ')} vs 台架 ${rigKnives.join(' ')} · 散文 ${proseKnives.join('/') || '没解析到'}`);
 
 // ---- D12 接线：台账被 CI、package.json、README 指着，而且这条接线自己有一把刀 ----
 const sabWires = {

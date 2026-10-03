@@ -42,9 +42,9 @@ fi
 
 UDD=$(mktemp -d)
 "$CHROME" --headless=new --remote-debugging-port=$CDP_PORT --user-data-dir=$UDD \
-  --window-size=900,780 --no-first-run --no-default-browser-check about:blank >/tmp/lightsout-chrome.log 2>&1 &
+  --window-size=900,780 --no-first-run --no-default-browser-check about:blank >"$TMPD/chrome.log" 2>&1 &
 CPID=$!
-node "$HERE/server.cjs" $WEB_PORT >/tmp/lightsout-server.log 2>&1 &
+node "$HERE/server.cjs" $WEB_PORT >"$TMPD/server.log" 2>&1 &
 SPID=$!
 cleanup() {
   kill -9 $CPID $SPID 2>/dev/null
@@ -160,7 +160,7 @@ for r in rows:
     if not r["pass"]: print("  FAIL", r["test"], json.dumps(r["detail"], ensure_ascii=False)[:240])
 sys.exit(1 if d.get("fail") else 0)
 ' || FAILED=1
-  node tools/playtest.mjs shot "/tmp/lightsout-$s.png" >/dev/null 2>&1
+  node tools/playtest.mjs shot "$TMPD/shot-$s.png" >/dev/null 2>&1
 done
 
 echo "=== console ==="
