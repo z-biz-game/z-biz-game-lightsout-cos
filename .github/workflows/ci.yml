@@ -22,9 +22,15 @@ jobs:
         with:
           node-version: 22
       - name: Syntax
-        run: for f in js/*.js js/*/*.js server.cjs electron/main.cjs tools/*.mjs test/*.mjs; do node --check "$f"; done
+        run: npm run check
       - name: Suites
-        run: for f in test/*.test.mjs; do echo "::group::$f"; node "$f"; echo "::endgroup::"; done
+        run: npm run unit
+      # 文档印出去的每一个数都由等式重测：代码改了字、文档还在引用上一个世界的数，这一步红。
+      - name: Documentation figures
+        run: node tools/doctest.mjs
+      # 上面那条闸自己有没有咬合力，由这份台账逐把刀回答。
+      - name: Ledger trips the assertion each knife names
+        run: python3 tools/sabotage.py
 
   # The shell is only proven by driving a real page with real mouse events.
   browser:
