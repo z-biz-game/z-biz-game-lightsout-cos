@@ -102,7 +102,7 @@ if [ -z "${SKIP_UNIT:-}" ]; then
   DS=$(sed -n 's/^rows: \([0-9]*\) fail: \([0-9]*\)$/\1\/\2/p' "$LLOG" | tail -1)
   grep -E '^  未过：' "$LLOG" | head -25
   if [ "$DS" != "$(pin_of doctest)/0" ]; then
-    echo "逻辑闸 doctest 体量 ${DS:-没打印 rows: 这一行} != 钉的 $(pin_of doctest)/0（rc=$DS_RC）—— 增删一条断言要同时改 LOGIC_EXPECTS 与 D13b" >&2
+    echo "逻辑闸 doctest 体量 ${DS:-没打印 rows: 这一行} != 钉的 $(pin_of doctest)/0（rc=${DS_RC}）—— 增删一条断言要同时改 LOGIC_EXPECTS 与 D13b" >&2
     FAILED=1
   else
     echo "逻辑闸 doctest：$(pin_of doctest) 项、0 项失败 ✓"
@@ -115,7 +115,7 @@ if [ -z "${SKIP_UNIT:-}" ]; then
   SB=$(sed -n 's/^rows: \([0-9]*\) fail: \([0-9]*\)$/\1\/\2/p' "$LLOG" | tail -1)
   grep -E '^  (没红|!!|判定|===)' "$LLOG" | head -12
   if [ "$SB" != "$(pin_of sabotage)/0" ]; then
-    echo "台账体量 ${SB:-没打印 rows: 这一行} != 钉的 $(pin_of sabotage)/0（rc=$SB_RC）—— 刀少了，或某一刀没能把点名的断言逼红" >&2
+    echo "台账体量 ${SB:-没打印 rows: 这一行} != 钉的 $(pin_of sabotage)/0（rc=${SB_RC}）—— 刀少了，或某一刀没能把点名的断言逼红" >&2
     FAILED=1
   else
     echo "台账：$(pin_of sabotage) 把刀各自逼红了点名的断言 ✓"

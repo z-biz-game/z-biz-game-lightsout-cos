@@ -193,7 +193,7 @@ KNIVES = [
 
     # ---- 文档侧：这一档咬的是 tools/doctest.mjs 自己 ----
     ('L14', '文档印的追踪文件数比仓里少一个',
-     [('README.md', '`git ls-files | wc -l` = 49', '`git ls-files | wc -l` = 48', 1)],
+     [('README.md', '`git ls-files | wc -l` = 52', '`git ls-files | wc -l` = 51', 1)],
      [GATE],
      'D10 文档说的追踪文件数等于 git ls-files 现在的数（新增一个文件要一起改文档）'),
 
