@@ -4,20 +4,26 @@
 // js/main.js），cache-first 会把 ES module 永久钉死在第一次装包时的那一版，之后每次
 // 发版都会出现"新 HTML 配旧 JS"的鬼状态——而 HTML 里内联的注册代码与 shell 结构是
 // 和 js 一起改的，这种错配正好是最容易炸的那一种。网络优先的代价是首屏多一次往返，
-// 换来的是"部署即生效"，对一个 4 个 JS 文件的小站是划算的。
+// 换来的是"部署即生效"。这个仓没有构建步骤，也没有带哈希的文件名可以豁免这件事。
 //
 // cache 名带 VERSION：发版时改这一个常量，activate 里旧版本缓存整批删掉。
-const VERSION = 'v1';
+// v1 -> v2：v1 的 SHELL 漏了 js/audio.js 和 js/clock.js。它们是 js/main.js 的 `import`，
+// ES module 图缺一块整页就是白屏，而"装完 shell 立刻断网"正好踩在这一条上。
+const VERSION = 'v2';
 const CACHE = `lightsout-${VERSION}`;
 
 // 装包时预热的外壳。缺一个也不报错（下面的 catch 吞掉），因为离线能不能开是次要的，
 // 在线时绝不能因为预热失败而卡住 install。
+// 这份清单不由手抄：test/sw-shell.test.mjs 自己走一遍 js/main.js 的 import 闭包，再连上
+// index.html 里 href/src 指向的本地文件一起对账，少列一个就红。
 const SHELL = [
   './',
   './index.html',
   './css/game.css',
   './js/main.js',
   './js/view.js',
+  './js/audio.js',
+  './js/clock.js',
   './js/core/game.js',
   './js/core/grid.js',
   './js/core/gf2.js',
@@ -28,6 +34,11 @@ const SHELL = [
   './js/core/storage.js',
   './js/data/lots.js',
   './manifest.webmanifest',
+  './favicon.ico',
+  './art/icons/icon-16.png',
+  './art/icons/icon-32.png',
+  './art/icons/icon-48.png',
+  './art/icons/icon-96.png',
   './art/icons/icon-192.png',
   './art/icons/icon-512.png',
   './art/icons/apple-touch-icon.png',
