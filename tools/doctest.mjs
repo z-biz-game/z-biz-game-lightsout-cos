@@ -265,6 +265,8 @@ for (const m of ciRows) {
 // `path:NN`（`dir/file.js::symbol`）。`::` 取段排在 `/` 判据之前（否则带目录限定的符号名被当成路径而丢掉锚点）；
 // 带 `<占位>` 的模板 body 取字面量前缀；带空格的 body 是命令行，硬按首词钉就是一次假红；
 // 纯标点（`，`、`、`）隔开的那个名字只是列表的上一项，不构成指认。
+// 锚点比的是**整词**不是子串：`applyPres` 坐在声明 `applyPress` 的那一行上不算命中（两侧再是标识符
+// 字符就不是这个标识符本身），子串口径比它替掉的手抄清单更弱，会把一次真的漂读成绿。
 // 输入集从目录现数：老写法只读 README+DESIGN，deliverable.md 那 13 条引用一直没人看，
 // 而闸照样打印"全部在范围内"——手抄的名单会让这条腿自己缩样。
 // 除 `path:NN` 之外还认**续引**（完整引用后面只写行号）：它只向同一句里最近的那条完整引用借出处，
@@ -364,6 +366,18 @@ for (const m of ciRows) {
     }
     return out;
   }
+  // 锚点认的是**整词**而不是子串：`applyPres` 坐在声明 `applyPress` 的那一行里也算"出现过"，
+  // 一个短名字会出现在任何碰巧含它的标识符里——于是子串口径比它替掉的那份手抄锚点表更弱，
+  // 一次真的漂会被读成绿。名字两侧不许再是标识符字符（字母、数字、`_`、`$`）。
+  // 缓存是因为一条腿要核上百次同一个名字。
+  const wordCache = new Map();
+  const hasWord = (text, name) => {
+    if (!wordCache.has(name)) {
+      wordCache.set(name, new RegExp('(^|[^A-Za-z0-9_$])' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^A-Za-z0-9_$])'));
+    }
+    return wordCache.get(name).test(text);
+  };
+
   const audit = (text) => {
     const orphans = [];
     const refs = parseRefs(text, orphans);
@@ -378,12 +392,12 @@ for (const m of ciRows) {
         continue;
       }
       // 在界内不等于指得到东西：整段落在空行上时，读者顺行号走过去只看见空白。
-      // 后面的 `continue` 让一把只交一行红，八把的计数才有意义。
+      // 后面的 `continue` 让一把只交一行红，九把的计数才有意义。
       if (lines.slice(r.from - 1, r.to).join('').trim() === '') {
         outOfRange.push(`${label} 那几行整段是空行`);
         continue;
       }
-      if (r.anchor && !lines.slice(r.from - 1, r.to).join('\n').includes(r.anchor)) {
+      if (r.anchor && !hasWord(lines.slice(r.from - 1, r.to).join('\n'), r.anchor)) {
         anchorBad.push(`${label} 那几行里没有 ${r.anchor}`);
       }
     }
@@ -468,18 +482,20 @@ for (const m of ciRows) {
     'D9s 同一句改写成完整引用就读得回来：D9r 红的是写法，不是解析器漏了这一句',
     `refs=${cC.refs.length} 借不到=${cC.unaddressed} 红=${cC.anchorBad.join(' | ') || '无'}`);
 
-  // 反空转：八把假引用必须一把不落——文件不存在、行号越界、四种写法各自的锚点漂、行数写错、
-  // 无锚点引用整段落在空行上。空行靶子的行号当场从 `server.cjs` 数出来，不抄常量：写死一个数字，
+  // 反空转：九把假引用必须一把不落——文件不存在、行号越界、四种写法各自的锚点漂、行数写错、
+  // 无锚点引用整段落在空行上、标识符的前缀不算整词。空行靶子的行号当场从 `server.cjs` 数出来，不抄常量：写死一个数字，
   // 那位子哪天被填上内容，这一把就悄悄不测了——所以 blankAt > 0 与计数一起判。
+  // 第九把的靶子也不是抄的：`js/core/grid.js:57` 那行声明的是 `applyPress`，而标识符只能**包含**它的前缀，
+  // 所以子串口径一定把它读成绿——这一把就是所有候选里最先哑掉的那一把，锚点检查哪天退回 `.includes` 它当场红。
   const blankLines = linesOf('server.cjs') || [];
   let blankAt = 0;
   for (let i = 1; i < blankLines.length; i++) if (String(blankLines[i]).trim() === '') { blankAt = i + 1; break; }
   const F = audit('出处 `js/core/nope.js:1`、`server.cjs:99999`、`NO_SUCH_ANCHOR` 在 `server.cjs:48`、' +
     '`package.json`（999 行）、`server.cjs:48`（`PORT`）、`server.cjs:48` 的 `PORT`、' +
     '`js/core/grid.js:57`（`Math.max(3, 4)`）' +
-    (blankAt ? '、`server.cjs:' + blankAt + '`' : ''));
-  ok(blankAt > 0 && F.outOfRange.length + F.anchorBad.length === 8,
-    `D9f 假引用八把全被抓到（不存在 / 越界 / 后向锚点漂 / 行数错 / 前向括号锚点漂 / 「的」锚点漂 / 函数调用形式锚点漂 / 无锚点落在空行第 ${blankAt} 行）`,
+    (blankAt ? '、`server.cjs:' + blankAt + '`' : '') + '、`js/core/grid.js:57`（`applyPres`）');
+  ok(blankAt > 0 && F.outOfRange.length + F.anchorBad.length === 9,
+    `D9f 假引用九把全被抓到（不存在 / 越界 / 后向锚点漂 / 行数错 / 前向括号锚点漂 / 「的」锚点漂 / 函数调用形式锚点漂 / 无锚点落在空行第 ${blankAt} 行 / 前缀不算整词）`,
     [...F.outOfRange, ...F.anchorBad].join(' | '));
 
   // 阳性对照：五种真注解写法 + 真行数必须判绿，否则上一条的"红"可能只是解析器自己坏了。
@@ -494,7 +510,7 @@ for (const m of ciRows) {
     'D9g 后向、前向括号、「的」、`path::symbol`、函数调用五种真注解加带空格的命令行 body，都在同一个解析器下判绿',
     [...fwd.outOfRange, ...fwd.anchorBad].join(' | ') + `（refs=${fwd.refs.length}）`);
   // 模板前缀：`name:<占位>` 指的是那串字面量前缀。本仓文档没这么写过，所以这一把只由台架证明；
-  // 规则一丢，`NOPE:<占位>` 那种假引用连锚点都不会生成，八把里就少一把。
+  // 规则一丢，`NOPE:<占位>` 那种假引用连锚点都不会生成，九把里就少一把。
   const tplGreen = audit('`js/core/grid.js:57`（`applyPress:<占位>`）');
   const tplRed = audit('`js/core/grid.js:57`（`NOPE:<占位>`）').anchorBad;
   ok(tplGreen.anchorBad.length === 0 && tplGreen.refs.length === 1 && tplRed.length === 1,
