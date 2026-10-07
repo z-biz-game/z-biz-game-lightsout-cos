@@ -290,8 +290,8 @@ KNIVES = [
     # ---- D13 那一组钉的是"门也在家门口"。这两把刀各回答一个问题：
     # 钉被悄悄改小会不会红（L30）、调用被摘掉会不会红（L31）。
     ('L30', 'verify.sh 的 LOGIC_EXPECTS 把 doctest 那一项钉小 2',
-     [('tools/verify.sh', 'LOGIC_EXPECTS="doctest:52 sabotage:31"',
-       'LOGIC_EXPECTS="doctest:50 sabotage:31"', 1)],
+     [('tools/verify.sh', 'LOGIC_EXPECTS="doctest:61 sabotage:32"',
+       'LOGIC_EXPECTS="doctest:59 sabotage:32"', 1)],
      [GATE],
      'D13b verify.sh 钉的 doctest 项数等于本闸实跑的项数（增删一条断言要两处一起走）'),
 
@@ -299,6 +299,14 @@ KNIVES = [
      [('tools/verify.sh', 'node "$HERE/tools/doctest.mjs" >"$LLOG" 2>&1\n', '', 1)],
      [GATE],
      'D13d 三道逻辑闸在 verify.sh 里各有一条真调用（注释里提到路径不算调用）'),
+
+    # L21 证明越界那一半会红；这一把补的是另一半：行号还在界内、却漂到了隔壁一行。
+    # 57 是 `export function applyPress(...)`，58 是它函数体第一行——文件有 62 行以上，
+    # 越界检查一条都不会红，只有锚点 `applyPress` 抓得住。
+    ('L32', '文档把一条界内的行号引用挪歪一格（只有锚点腿看得见）',
+     [('README.md', '`applyPress`（`js/core/grid.js:57`）', '`applyPress`（`js/core/grid.js:58`）', 1)],
+     [GATE],
+     'D9c 贴着引用的那个名字真的出现在被指的那几行里（行号漂到隔壁一行要红）'),
 ]
 
 

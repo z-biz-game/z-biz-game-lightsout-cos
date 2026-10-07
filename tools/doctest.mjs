@@ -32,8 +32,6 @@ const ok = (cond, label, detail) => {
 };
 
 const README = read('README.md');
-const DESIGN = existsSync(join(ROOT, 'DESIGN.md')) ? read('DESIGN.md') : '';
-const DOCS = README + '\n' + DESIGN;
 const CI = read('.github/workflows/ci.yml');
 const VERIFY = read('tools/verify.sh');
 const PKG = JSON.parse(read('package.json'));
@@ -259,26 +257,177 @@ for (const m of ciRows) {
     block.includes(`name: ${m[3]}`) ? (block.includes(m[1]) ? '步名与命令都在' : '步名在，命令不是这条') : '工作流里没有这一步');
 }
 
-// ---- D9 行号引用：文档写 path:NN 的，NN 必须落在真实行数里 ----
-const cites = [...DOCS.matchAll(/`?([\w./-]+\.(?:js|mjs|cjs|sh|yml|css|html)):(\d+)(?:-(\d+))?`?/g)]
-  // `{grid,gf2,solve}.js:NN` 那种花括号列举不是引用：它既没有目录、前面又贴着分隔符。
-  // 不能按"前面是全角括号"丢——`（js/core/game.js:83-88` 是正经引用，本轮 L21 就是这么漏掉的。
-  .filter((m) => m[1].includes('/') || !',{，（{'.includes(DOCS[m.index - 1] || ''));
-const outRange = [];
-for (const c of cites) {
-  let rel = c[1];
-  if (!existsSync(join(ROOT, rel))) {
-    // 文档里也有只写文件名的引用（`solve.js:18`）：按文件名在仓里找，唯一命中才算引用得到。
-    const hits = TRACKED.filter((p) => p === rel || p.endsWith('/' + rel));
-    if (hits.length !== 1) { outRange.push(`${rel} 不存在${hits.length > 1 ? '（同名文件不唯一）' : ''}`); continue; }
-    rel = hits[0];
+// ---- D9 行号引用：写了行号就得还在文件里，而且贴着引用的那个名字得真在被指的那几行上 ----
+// 越界检查抓不住"漂到隔壁一行"：本轮清出来的两条（`server.cjs:48` 上是 `port = 5190` 而不是 `PORT`、
+// `js/main.js:33-42` 里根本没有 `press`）都稳稳落在界内，界内检查一条都不会红。
+// 锚点规则与 fleet（ferry / tatamibari / echo-location / creek）同一份，五种贴法都认：
+// `name`（`path:NN`）、`path:NN`（`name`）、`path:NN` 的 `name`、`path:NN`（`fn(a, b)`）、
+// `path:NN`（`dir/file.js::symbol`）。`::` 取段排在 `/` 判据之前（否则带目录限定的符号名被当成路径而丢掉锚点）；
+// 带 `<占位>` 的模板 body 取字面量前缀；带空格的 body 是命令行，硬按首词钉就是一次假红；
+// 纯标点（`，`、`、`）隔开的那个名字只是列表的上一项，不构成指认。
+// 输入集从目录现数：老写法只读 README+DESIGN，deliverable.md 那 13 条引用一直没人看，
+// 而闸照样打印"全部在范围内"——手抄的名单会让这条腿自己缩样。
+{
+  const docFiles = readdirSync(ROOT).filter((f) => f.endsWith('.md'));
+  ok(docFiles.length >= 3, 'D9a 本仓根下有三份以上的文档可审（闸的输入集不许自己空掉）', docFiles.join(','));
+  let docText = '';
+  for (const f of docFiles) docText += read(f) + '\n';
+
+  const PATH_SRC = '[\\w./-]+?\\.(?:js|mjs|cjs|sh|json|yml|html|css)';
+  const CITE = new RegExp('^(' + PATH_SRC + '):([0-9]+(?:[,-][0-9]+)*)$');
+  // 锚点可以是成员路径（`view.cellCenter`），但不许是文件路径：body 里带 `/` 的那一类是另一条引用。
+  const ID = /^[A-Za-z_$][A-Za-z0-9_$]{2,}(?:\.[A-Za-z_$][A-Za-z0-9_$]+)*$/;
+  const tokOf = (body) => {
+    const seg = body.includes('::') ? body.slice(body.lastIndexOf('::') + 2) : body;
+    if (seg.includes('/')) return '';
+    // 只有真写了占位符才这么拆，否则 `deploy-set:selftest` 这种脚本名会被拆成 `deploy`。
+    const tpl = /^([^<>]+?)<[^<>\s]+>/.exec(seg);
+    if (tpl && ID.test(tpl[1].split(':')[0].trim())) return tpl[1].split(':')[0].trim();
+    const head = seg.split('(')[0].trim();
+    if (ID.test(head)) return head;
+    const lhs = head.split(/[=:]\s/)[0].trim();
+    return ID.test(lhs) ? lhs : '';
+  };
+  // 文档里也有只写文件名的引用（`solve.js:18`）：按 git 追踪清单找唯一同名文件，多处同名不算指到实处。
+  function resolvePath(p) {
+    if (existsSync(join(ROOT, p))) return p;
+    const hits = TRACKED.filter((t) => t === p || t.endsWith('/' + p));
+    return hits.length === 1 ? hits[0] : null;
   }
-  const n = readFileSync(join(ROOT, rel), 'utf8').split('\n').length;
-  if (+c[2] > n || (c[3] && +c[3] > n)) outRange.push(`${rel}:${c[2]}${c[3] ? '-' + c[3] : ''}（该文件只有 ${n} 行）`);
+  const lineCache = new Map();
+  const linesOf = (p) => {
+    if (!lineCache.has(p)) {
+      const rel = resolvePath(p);
+      let arr = null;
+      if (rel) {
+        arr = read(rel).split('\n');
+        if (arr[arr.length - 1] === '') arr.pop();
+      }
+      lineCache.set(p, arr);
+    }
+    return lineCache.get(p);
+  };
+  function parseRefs(text) {
+    const spans = [];
+    const spanRe = /`([^`\n]+)`/g;
+    let m;
+    while ((m = spanRe.exec(text))) spans.push({ body: m[1], s: m.index, end: m.index + m[0].length });
+    const out = [];
+    for (let i = 0; i < spans.length; i++) {
+      const c = spans[i].body.match(CITE);
+      if (!c) continue;
+      let anchor = '';
+      let consumed = false;
+      const next = spans[i + 1];
+      const gA = next ? text.slice(spans[i].end, next.s) : null;
+      if (gA !== null && gA.length <= 4 && !gA.includes('\n')) {
+        const gN = gA.replace(/\s+/g, '');
+        if (/^[（(]/.test(gN) || gN === '的') { consumed = true; anchor = tokOf(next.body); }
+      }
+      // 前向没认出注解形状时才接着试后向；用 `else if` 挂在前向条件上，
+      // 「`NAME` 在 `path:NN`、」这种后面紧跟短间隔的写法就把后向那把弄哑了。
+      if (!consumed && i > 0) {
+        const prev = spans[i - 1];
+        const gap = text.slice(prev.end, spans[i].s);
+        const gT = gap.replace(/\s+/g, '');
+        const shaped = /^[（(]/.test(gT) || /[\w一-鿿]/.test(gT);
+        if (shaped && !/\s/.test(prev.body) && gap.length <= 4 && !gap.includes('\n')) anchor = tokOf(prev.body);
+      }
+      for (const seg of c[2].split(',')) {
+        const parts = seg.split('-').map(Number);
+        out.push({ path: c[1], from: parts[0], to: parts[parts.length - 1] || parts[0], anchor });
+      }
+    }
+    return out;
+  }
+  const audit = (text) => {
+    const refs = parseRefs(text);
+    const outOfRange = [];
+    const anchorBad = [];
+    for (const r of refs) {
+      const label = `${r.path}:${r.from}${r.to !== r.from ? '-' + r.to : ''}`;
+      const lines = linesOf(r.path);
+      if (!lines) { outOfRange.push(`${label} 文件不存在（同名文件不唯一时也不算指到实处）`); continue; }
+      if (r.from < 1 || r.to > lines.length) {
+        outOfRange.push(`${label}（该文件只有 ${lines.length} 行）`);
+        continue;
+      }
+      if (r.anchor && !lines.slice(r.from - 1, r.to).join('\n').includes(r.anchor)) {
+        anchorBad.push(`${label} 那几行里没有 ${r.anchor}`);
+      }
+    }
+    // `` `文件`（N 行）`` 这种实测值按等式收：写歪一格、文件不在，都算指不回实处。
+    const cntRe = new RegExp('`(' + PATH_SRC + ')`（([0-9]+) 行）', 'g');
+    let k;
+    while ((k = cntRe.exec(text))) {
+      const lines = linesOf(k[1]);
+      if (!lines) outOfRange.push(`${k[1]}（${k[2]} 行）文件不存在`);
+      else if (lines.length !== +k[2]) outOfRange.push(`${k[1]} 实测 ${lines.length} 行，文档写的是 ${k[2]}`);
+    }
+    return { refs, outOfRange, anchorBad };
+  }
+  const A = audit(docText);
+  const anchored = A.refs.filter((r) => r.anchor).length;
+
+  ok(A.refs.length >= 40, 'D9b 这条腿读到的引用数多到它自己算覆盖面（少于 40 条就是输入集缩了）', `本次解析 ${A.refs.length} 条`);
+  ok(A.outOfRange.length === 0, 'D9 文档里的每条 path:NN 引用都落在真实文件的行数内（写了行号就得还在文件里）',
+    A.outOfRange.length ? `越界或不存在：${A.outOfRange.join('，')}` : `${A.refs.length} 条全部在范围内`);
+  ok(A.anchorBad.length === 0, 'D9c 贴着引用的那个名字真的出现在被指的那几行里（行号漂到隔壁一行要红）',
+    A.anchorBad.length ? `锚点漂 ${A.anchorBad.length} 处：${A.anchorBad.join(' | ')}` : `${anchored} 条带锚点的引用全部落回原处`);
+  // 锚点腿自己的覆盖面：指认条数太少说明规则被写窄（或文档被改写），那时上一条的"绿"是空转。
+  ok(anchored >= 8, 'D9d 文档里确实有足够多的引用带指认（少于 8 条就是锚点腿空转）', `本次认到锚点的 ${anchored} 条`);
+
+  // 等式闸：文档转写的「解析 N 条」必须等于这条腿自己数到的，且文档确实写了它——删掉数字同样算红。
+  {
+    const claims = [...docText.matchAll(/解析 (\d+) 条/g)].map((x) => +x[1]);
+    ok(claims.length >= 1 && claims.every((c) => c === A.refs.length),
+      'D9e 文档里每一处「解析 N 条」都等于这条腿自己数到的（删掉这个数字同样算红）',
+      `闸数到 ${A.refs.length} · 文档写了 ${claims.length} 处：${[...new Set(claims)].join('/') || '（一处都没写）'}`);
+  }
+
+  // 反空转：七把假引用必须一把不落——文件不存在、行号越界、四种写法各自的锚点漂、行数写错。
+  const F = audit('出处 `js/core/nope.js:1`、`server.cjs:99999`、`NO_SUCH_ANCHOR` 在 `server.cjs:48`、' +
+    '`package.json`（999 行）、`server.cjs:48`（`PORT`）、`server.cjs:48` 的 `PORT`、' +
+    '`js/core/grid.js:57`（`Math.max(3, 4)`）');
+  ok(F.outOfRange.length + F.anchorBad.length === 7,
+    'D9f 假引用七把全被抓到（不存在 / 越界 / 后向锚点漂 / 行数错 / 前向括号锚点漂 / 「的」锚点漂 / 函数调用形式锚点漂）',
+    [...F.outOfRange, ...F.anchorBad].join(' | '));
+
+  // 阳性对照：五种真注解写法 + 真行数必须判绿，否则上一条的"红"可能只是解析器自己坏了。
+  // 带空格的命令行 body（`npm run doctest`）也在这一组里：它"不该生成锚点"，
+  // 老写法按首词切会拿 `npm` 去钉，在自己造的那一行上红。
+  const pkgLines = linesOf('package.json');
+  const fwd = audit('`applyPress`（`js/core/grid.js:57`）、`js/core/grid.js:57`（`applyPress`）、' +
+    '`js/core/grid.js:57` 的 `applyPress`、`js/core/gf2.js:53`（`js/core/gf2.js::getSolver`）、' +
+    '`js/core/grid.js:57`（`applyPress(board, n, j)`）、`js/core/grid.js:57`（`npm run doctest`） 与 ' +
+    '`package.json`（' + (pkgLines ? pkgLines.length : 0) + ' 行）');
+  ok(fwd.anchorBad.length === 0 && fwd.outOfRange.length === 0 && fwd.refs.length === 6,
+    'D9g 后向、前向括号、「的」、`path::symbol`、函数调用五种真注解加带空格的命令行 body，都在同一个解析器下判绿',
+    [...fwd.outOfRange, ...fwd.anchorBad].join(' | ') + `（refs=${fwd.refs.length}）`);
+  // 模板前缀：`name:<占位>` 指的是那串字面量前缀。本仓文档没这么写过，所以这一把只由台架证明；
+  // 规则一丢，`NOPE:<占位>` 那种假引用连锚点都不会生成，七把里就少一把。
+  const tplGreen = audit('`js/core/grid.js:57`（`applyPress:<占位>`）');
+  const tplRed = audit('`js/core/grid.js:57`（`NOPE:<占位>`）').anchorBad;
+  ok(tplGreen.anchorBad.length === 0 && tplGreen.refs.length === 1 && tplRed.length === 1,
+    'D9h 模板 body 取字面量前缀：前缀对得上判绿、对不上必须红（规则一丢这一把就哑）',
+    `绿=${tplGreen.anchorBad.length ? tplGreen.anchorBad.join(' | ') : 'ok'} · 红在 ${tplRed.join(' | ') || '（一处都没红）'}`);
+  // 反方向的控制：逗号不是指认。前面那个名字只是列表的上一项，按它钉会把正确的文档读红。
+  const comma = audit('`NO_SUCH_ANCHOR`，`js/core/grid.js:57`');
+  ok(comma.anchorBad.length === 0 && comma.refs.length === 1,
+    'D9i 纯标点间隔（`，`）不构成指认：这种写法必须判绿',
+    comma.anchorBad.join(' | ') + `（refs=${comma.refs.length}）`);
+
+  // 这条腿对本仓文档真有牙齿：把一条界内的真引用挪歪一格，只有锚点抓得住。
+  // 改的是内存里的副本，盘上的文档一个字不动。
+  {
+    const needle = '`applyPress`（`js/core/grid.js:57`）';
+    const hits = docText.split(needle).length - 1;
+    const p = audit(docText.replace(needle, '`applyPress`（`js/core/grid.js:58`）'));
+    ok(hits === 1 && p.anchorBad.length === 1,
+      'D9j 把文档里一条真引用的行号挪歪一格，这条腿必须为它变红',
+      `needle 命中 ${hits} 处 · 红在 ${[...p.outOfRange, ...p.anchorBad].join(' | ') || '（一处都没红）'}`);
+  }
 }
-ok(cites.length >= 8, 'D9a 文档里解析到了行号引用（一条都没有就是这段没在跑）', `${cites.length} 条`);
-ok(outRange.length === 0, 'D9 文档里的每条 path:NN 引用都落在真实文件的行数内（写了行号就得还在文件里）',
-  outRange.length ? `越界：${outRange.join('，')}` : `${cites.length} 条全部在范围内`);
 
 // ---- D10 追踪文件数：文档印的 `git ls-files | wc -l` 等于现在的仓 ----
 const trackedCount = TRACKED.length;

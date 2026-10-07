@@ -152,7 +152,7 @@ hashSeed('a') =  723832900  (0x2b24d044)
 | 4 | **[规格主张]** 只信代数一个来源 | 代数若算错（错主元 / 假陪集）不会自己报警 | 第二条独立腿：4×4 全 65536 盘 GF(2) 陪集最小权 vs 不用代数的按键图 BFS，mismatches 0 | 简报 §2；`test/gf2-vs-bfs.test.mjs`（本会话打印 `image 4096, diameter 7, mismatches 0`） |
 | 5 | **[家族教训]** 把"生成包络"与"已发布 min/max"当同一个数 | 两者会静默合并，UI 印出从未落成的区间（gridlock 抄错过的格） | `make.js` 的 `TIERS` 是包络，`lots.js` 的 `TIERS_META` 是实际落成的 min/max；UI 印后者 | `tools/bake.mjs:132-145`；`test/library.test.mjs` "the bands on screen are the bands in the file" |
 | 6 | **[代码注释已记]** 想给 5×5 也做全态 BFS | 2^25=33.5M 盘、像集 8.4M，扫它是几分钟几百 MB，且不增加证据**种类** | `bfsTable` 上界 `MAX_SWEEP_BITS=20`，5×5 **抛错而非钳制**；5×5 采样对账 | `js/core/solve.js:18,43`；`test/gf2-vs-bfs.test.mjs` "the 5x5 graph is too big to sweep, and the code says so instead of hanging" |
-| 7 | **[本仓易踩]** shell/view 自己重推位布局 | 位布局是 `grid.js` 的知识，出现第二份位移就会与规则漂移 | 改盘面唯一入口是 `applyPress`/`press`；view 只提供几何 `cellCenter/cellRect` 不判合法性 | `js/core/grid.js:57`；`js/main.js:33-42` 的 `press`；`js/view.js` 头注 |
+| 7 | **[本仓易踩]** shell/view 自己重推位布局 | 位布局是 `grid.js` 的知识，出现第二份位移就会与规则漂移 | 改盘面唯一入口是 `applyPress`/`press`；view 只提供几何 `cellCenter/cellRect` 不判合法性 | `js/core/grid.js:57`（`applyPress`）；`js/main.js:278` 的 `press`；`js/view.js` 头注 |
 | 8 | **[家族教训]** `localStorage` 当"取不到就是 undefined" | `file://`/隐私模式下**碰属性就抛**，`setItem` 随时抛 Quota | 一切访问经守卫 `backend()`，抛错=退回内存不崩；清档连内存缓存一起换 | `js/core/storage.js:26-34,149-161`；`test/storage.test.mjs` "a localStorage that throws ... is a fallback, not a crash" |
 
 ---

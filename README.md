@@ -89,7 +89,7 @@ blackout 包络 11–15，落在 11–14。两者并排存着、各测一次，`
 | `hashSeed` 不是教科书 FNV-1a（它是分享链接稳定的地基） | `node test/rng.test.mjs` | 每字符两轮 UTF-16 混合的**逐位期望值**，另把游戏用到的每颗 seed 钉到第二套实现 | `rows: 10 fail: 0`（这一套就占了 11981 次断言）；第 6 枪（抹掉第二轮）红在 `two rounds per character: a variant, and knowingly not textbook FNV-1a` |
 | 生成器只出货"带内、可解、不重复"的盘 | `node test/make.test.mjs` | 拒绝原因词表必须**恰好**是 `bake.mjs` 打印的那四个，多一个少一个都算红 | `rows: 8 fail: 0`；第 10 枪（dim 的窗口放宽到 `[4,9]`）红在 `the ladder is four bands, each with a key dial and a measured par window` |
 | 每一关都能用真鼠标点完、点数与星级都对 | `bash tools/verify.sh` 的 `@pointer` | CDP `Input.dispatchMouseEvent` 发**真**事件，坐标取自 `js/view.js` 的 `cellCenter()`，从不叫 `window.lights` 代劳 | `rows: 21 fail: []`；全程 `(no console output)` |
-| **本文印的每一个数都还等于现在的代码**（秩表、四带表、包络与落点、套件分账、腿清单、端口、脚本清单、CI 步、行号引用、追踪文件数） | `node tools/doctest.mjs` | 一组等式，每一条都配一句"解析到了几行"的反空转断言：正则没命中不是绿，是红；套件分账那一档是**真的把 9 套现跑一遍**再比文档。这条闸自己有几行等式不在本文里印（加了断言就会漂），它由命令自己打印，见门禁清单 | 见下面门禁清单的「文档闸」那一行；台账 L14–L22 九把刀逐条证明它咬得动，L23–L25 三把证明它不把散文当数 |
+| **本文印的每一个数都还等于现在的代码**（秩表、四带表、包络与落点、套件分账、腿清单、端口、脚本清单、CI 步、行号引用、追踪文件数） | `node tools/doctest.mjs` | 一组等式，每一条都配一句"解析到了几行"的反空转断言：正则没命中不是绿，是红；套件分账那一档是**真的把 9 套现跑一遍**再比文档。这条闸自己有几行等式不在本文里印（加了断言就会漂），它由命令自己打印，见门禁清单 | 见下面门禁清单的「文档闸」那一行；台账 L14–L22 九把刀逐条证明它咬得动，L23–L25 三把证明它不把散文当数，L32 证明行号漂到隔壁一行也会红 |
 | 上面这条闸不是装饰品：它自己有一把刀，砍掉"有人在跑它"就红 | `python3 tools/sabotage.py` 的 L26–L29 | 在副本里分别摘掉 CI 的台账步、CI 的文档闸步、`package.json` 的 `sabotage` 脚本、README 里那句指向台账的话 | 四把都红在 `D12` 那条接线断言上，打印 `ci=缺 · pkg=在 · readme=在 · knife=在` 这样的分账（只缺一处、其余在位）|
 | 一个语法错的文件不许上线 | CI 的 `Syntax` 步（`.github/workflows/ci.yml:24-25`），本地 `npm run check` | 对 `js/**`、`server.cjs`、`electron/main.cjs`、`tools/*.mjs`、`test/*.mjs` 逐个 `node --check` | `npm run check` → `OK`（本轮展开成 26 个文件） |
 
@@ -103,8 +103,8 @@ node 层合计本轮 **`rows: 94 / asserts: 21151 / fail: 0`**（9 个套件，�
 替换前先断言 needle 在目标文件里恰好出现一次，打不中就报 `ERROR` 并计入不符——针打不中却写上一句"通过"，
 是台账最坏的一种绿。然后跑它点名的套件/闸，要求**红，并且红在它点名的那条断言名上**（认的是 `FAIL` /
 `未过：` 那行的**原文全等**，转述不算点名）。跑刀之前先把未破坏的副本整套跑一遍当基线，基线有红就直接退出 2：
-否则后面每一枪的"红"都没有对照。共 **31 把**：11 把咬代数与引擎，2 把是产品侧"不该红"的对照（配色与文案），
-9 把咬本文印的数，3 把是文档侧"不该红"的对照（改散文不许红），6 把咬"这条闸到底有没有人在跑"。
+否则后面每一枪的"红"都没有对照。共 **32 把**：11 把咬代数与引擎，2 把是产品侧"不该红"的对照（配色与文案），
+10 把咬本文印的数，3 把是文档侧"不该红"的对照（改散文不许红），6 把咬"这条闸到底有没有人在跑"。
 
 | 刀 | 破坏 | 跑什么 | 结果 |
 |---|---|---|---|
@@ -139,6 +139,7 @@ node 层合计本轮 **`rows: 94 / asserts: 21151 / fail: 0`**（9 个套件，�
 | L29 | 把 README 里所有指向台账的话改掉（本轮七处一起） | 同上 | 红 1 条：`D12`（`readme=缺`，其余六处在）。这把用的是 `edit_all`：只改一处不会让那根线断，针数不对就当打不中 |
 | L30 | 本地那道门的 `LOGIC_EXPECTS` 把 doctest 钉小 2 | 同上 | 红 1 条：`D13b`（打印 `钉 50 · 实跑 52`）。钉改小一条就够——门看见的是"闸变窄了"，不是"这次没跑到" |
 | L31 | 摘掉 `tools/verify.sh` 里跑文档闸的那一行调用 | 同上 | 红 1 条：`D13d`（打印 `node 套件=1 · doctest=0 · sabotage=1`）。注释里提一句路径不算调用，这一条正是为了让"注释里写了"蒙不过去 |
+| L32 | 把本文那条 `applyPress` 的行号引用挪歪一格（57 → 58，还在文件里，越界检查看不见） | 同上 | 红 1 条：`D9c 贴着引用的那个名字真的出现在被指的那几行里（行号漂到隔壁一行要红）` |
 
 第 4 把值得单独说：原来的 `test/game.test.mjs` 只测了 `par`（三星）、`par+2`（两星）和一个远超的
 情形（一星），**`par+1` 那一档一次都没碰过**。于是"多按一手照样给三星"这个 bug 在门禁上是隐形的。
@@ -161,7 +162,7 @@ node 层合计本轮 **`rows: 94 / asserts: 21151 / fail: 0`**（9 个套件，�
    于是 L21（行号越界）该红却没红。现在只丢"没有目录分隔符且前面是逗号或花括号"的那种，
    被检查的行号引用从 10 条涨到 25 条——这 15 条之前是没人看的。
 
-跑刀之前还有一道**预检**：31 把的 needle 先在未破坏的副本上逐一点数，对不上就一枪不跑、退出码 3，
+跑刀之前还有一道**预检**：32 把的 needle 先在未破坏的副本上逐一点数，对不上就一枪不跑、退出码 3，
 并把每一条"现数 ≠ 期望"打印出来。它不是省时间（虽然确实省掉一整轮刀），它防的是**静默降级**：
 一把针打不中的刀如果只报一句"跑不动"，下一次读台账的人看到的就是一个不再存在的证据。
 本轮加完预检立刻抓到一次：L29 的针是"指认台账的那句话在本文出现几次"，我给文档补了新句子，针数就跟着漂——
@@ -184,6 +185,19 @@ CI 那一遍用 `SKIP_UNIT=1` 跳过这一段（那三步在 unit job 里各自�
 所以同一道门在两边跑的**是同一条**逻辑，而不是两份清单。
 逐把的读数写在仓内的 `_tmp-verify/`（`.gitignore` 挡着），跑完不留第二棵树。
 
+**文档行号这条腿这一轮换成了 fleet 同源的规则**（`tools/doctest.mjs` 的 `D9a`–`D9j`）。两处升级：
+输入集从目录现数（以前只读 README+DESIGN，`deliverable.md` 里那 13 条引用一直没人看，而闸照样打印"全部在范围内"），
+以及越界之外还要认**锚点**——贴着引用写在反引号里的那个名字，必须真的出现在被指的那几行里。
+只查越界抓不住"漂到隔壁一行"，本轮清出来的两条全都稳稳在界内：`server.cjs:48` 那行是 `port = 5190` 这个默认参数，
+`PORT` 环境变量在 `server.cjs:59`；`deliverable.md` 里"改盘面唯一入口"那条曾写作 `js/main.js:33-42`，
+而 `press` 实际在 `js/main.js:278`。两种都改成了各自指到的那一行，文档没有顺手把检查改宽。
+五种贴法都认：`applyPress`（`js/core/grid.js:57`）这种前后两向、`path:NN` 的 `name`、`fn(a, b)` 的调用形式、
+`dir/file.js::symbol` 的符号形式；带空格的命令行 body（`npm run doctest`）与纯标点间隔（`，`、`、`）不构成指认，
+按它们钉只会造出假红。本轮这条腿解析 52 条、认到锚点 12 条，控制一把不落：
+七把假引用逐把点名、五种真注解判绿、模板前缀那条规则一绿一红、逗号写法必须判绿，
+最后一把毒针只在内存里把一条真引用的行号挪歪一格（盘上的文档一个字不动）。
+没有覆盖：`path:NN` 之后用 `：MM` 续引的写法这条腿解析不到；`aria-label` 这种带连字符的名字不构成锚点。
+
 ## 本地运行与脚本清单
 
 ```bash
@@ -202,7 +216,7 @@ node server.cjs            # http://127.0.0.1:5190/  （ES module 需要 origin�
 | `verify` | `bash tools/verify.sh` | `=== ALL GREEN ===`，退出码 0（本文所有读数都来自这条） |
 | `electron` | `electron .` | 仓库不装 electron，**没跑过**（见"不承诺"） |
 | `doctest` | `node tools/doctest.mjs` | 文档数字闸：把本文印的每一个数与代码、套件、脚本现算的值逐个对账。本轮实测见门禁清单 |
-| `sabotage` | `python3 tools/sabotage.py` | 破坏试验台账：31 把刀逐条证明上面那些闸真能让它们点名的断言红。跑完把 `_sabotage-copy/` 删掉 |
+| `sabotage` | `python3 tools/sabotage.py` | 破坏试验台账：32 把刀逐条证明上面那些闸真能让它们点名的断言红。跑完把 `_sabotage-copy/` 删掉 |
 | `deploy-set` | `node tools/deploy-set.mjs` | 绿：对拷出来的产物提要求（见「上线的到底是哪一批文件」一节） |
 | `deploy-set:selftest` | `node tools/deploy-set-selftest.mjs` | 绿：9 刀逐类打红且点名 + 1 条阴性对照 |
 
@@ -219,7 +233,7 @@ CI 的入口与本地是同一条命令（下表左边那列在终端里一样�
 | `node tools/deploy-set.mjs` | unit | `Deploy set gate` |
 | `node tools/deploy-set-selftest.mjs` | unit | `Deploy set gate proves it can fail` |
 
-`unit` job 用 node 22；台账放在 unit 而不是 browser，因为这 31 把刀一把也不碰浏览器
+`unit` job 用 node 22；台账放在 unit 而不是 browser，因为这 32 把刀一把也不碰浏览器
 （它们只点 node 套件与文档闸），而 browser 那步是 `SKIP_UNIT=1`。
 `browser` job 用 `SKIP_UNIT=1 WD_TIMEOUT=240` 跑 `tools/verify.sh`。`.github/workflows/pages.yml` 没有构建步骤，只是 `mkdir _site` 然后拷 `index.html`、`css/`、`js/`
 （`server.cjs`、`electron/`、`tools/`、`test/` 都不上线），`actions/configure-pages@v5` 之后由
@@ -238,8 +252,8 @@ CI 的入口与本地是同一条命令（下表左边那列在终端里一样�
 | `gf2-vs-bfs` | 10 | 1079 | `storage` | 9 | 69 |
 | `solve` | 10 | 647 | **加总** | **94** | **21151** |
 
-文档闸 `node tools/doctest.mjs` 本轮读数 **`rows: 52 fail: 0`**；带上浏览器现量再跑
-（`node tools/doctest.mjs --measured <json>`）是 **`rows: 58 fail: 0`**，多出来的 6 行就是
+文档闸 `node tools/doctest.mjs` 本轮读数 **`rows: 61 fail: 0`**；带上浏览器现量再跑
+（`node tools/doctest.mjs --measured <json>`）是 **`rows: 67 fail: 0`**，多出来的 6 行就是
 `D5d` 加五条腿的行数对比。这两个数由这条命令自己在末行打印，抄在这里只为对账；它不进上面任何等式，
 因为断言一多这个数就漂——漂了也不算回归。
 
@@ -295,7 +309,7 @@ js/data/lots.js     构建期产物：TIERS_META + 32 行带实测 par 的关卡
 
 | 用途 | 值 | 定义处 |
 |---|---|---|
-| 手工试玩 | `http://127.0.0.1:5190/` | `server.cjs:48,59`（`PORT` 环境变量或 argv[2] 可换） |
+| 手工试玩 | `http://127.0.0.1:5190/` | `server.cjs:48`（`port = 5190` 默认值）、`server.cjs:59`（`PORT` 环境变量或 argv[2] 可换） |
 | 本地复验 | `WEB_PORT=5190`、`CDP_PORT=9341` | `tools/verify.sh:15-16`，可被同名环境变量覆盖 |
 | 页面内路由 | `#/`（战役）、`#/daily`、`#/lot/<id>` | `js/main.js:51-58`，认不出来返回 `mode: 'unknown'` |
 | 线上 | `https://z-biz-game.github.io/z-biz-game-lightsout-cos/` | Pages 带仓名前缀，所以 `css/`、`js/` 一律写相对路径 |
