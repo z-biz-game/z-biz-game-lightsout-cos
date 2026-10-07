@@ -290,8 +290,8 @@ KNIVES = [
     # ---- D13 那一组钉的是"门也在家门口"。这两把刀各回答一个问题：
     # 钉被悄悄改小会不会红（L30）、调用被摘掉会不会红（L31）。
     ('L30', 'verify.sh 的 LOGIC_EXPECTS 把 doctest 那一项钉小 2',
-     [('tools/verify.sh', 'LOGIC_EXPECTS="doctest:61 sabotage:32"',
-       'LOGIC_EXPECTS="doctest:59 sabotage:32"', 1)],
+     [('tools/verify.sh', 'LOGIC_EXPECTS="doctest:71 sabotage:32"',
+       'LOGIC_EXPECTS="doctest:69 sabotage:32"', 1)],
      [GATE],
      'D13b verify.sh 钉的 doctest 项数等于本闸实跑的项数（增删一条断言要两处一起走）'),
 

@@ -98,7 +98,7 @@ if [ -z "${SKIP_UNIT:-}" ]; then
   # 门要两边同一把。钉的是每道闸自己的条数：rc=0 看不出闸变窄——明天有人删掉 20 条断言，
   # 剩下的照样绿、整道闸照样 exit 0。这两颗钉由 tools/doctest.mjs 的 D13 那一组反向核对
   # （它读的就是下面这一行），改一处不改另一处就是红。
-  LOGIC_EXPECTS="doctest:61 sabotage:32"
+  LOGIC_EXPECTS="doctest:71 sabotage:32"
   pin_of() { printf '%s\n' "$LOGIC_EXPECTS" | tr ' ' '\n' | grep "^$1:" | cut -d: -f2; }
 
   echo "=== 逻辑闸 tools/doctest.mjs ==="

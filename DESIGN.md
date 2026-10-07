@@ -13,10 +13,10 @@
 
 1. **按一个键 = 与一张固定掩码异或**（`applyPress`，`js/core/grid.js:57`），所以它是**自身逆运算**：按两次 = 没按；
 2. **异或可交换**，所以决定盘面的**是按了哪些键（集合）**，与按的顺序无关；
-3. 十字邻域掩码 `flipMask(n, j)`（`:39`）= 键自己 + 上下左右，被矩形裁剪；`flipMask(n, j)[i] === flipMask(n, i)[j]`，
+3. 十字邻域掩码 `flipMask(n, j)`（`js/core/grid.js:39`）= 键自己 + 上下左右，被矩形裁剪；`flipMask(n, j)[i] === flipMask(n, i)[j]`，
    即**翻转矩阵 `M` 对称**。
 
-尺寸合法域 `3 ≤ n ≤ 7`（`MIN_N`/`MAX_N`/`validSize`，`:12,13,156`）。为什么矩形是硬约束见第 8 节。
+尺寸合法域 `3 ≤ n ≤ 7`（`MIN_N`/`MAX_N`/`validSize`，`js/core/grid.js:12,13,156`）。为什么矩形是硬约束见第 8 节。
 
 由 1、2 得：按一组键 `S` 的效果 = 把 `S` 的指示向量 `x(S)` 送进 `M`，盘面 = `M·x ⊕ b₀`。全部"能到达的盘面"
 就是 `M` 的列空间（像）。**这就是关灯不是搜索问题、而是线性代数问题的根因。**
@@ -25,15 +25,15 @@
 
 ## 2. 求解器：GF(2) 高斯消元，为什么它赢过 BFS
 
-`js/core/gf2.js` 的 `getSolver(n)`（`:53`）建矩阵并消元：
+`js/core/gf2.js` 的 `getSolver(n)`（`js/core/gf2.js:53`）建矩阵并消元：
 
-- 列 `cols = flipMasks(n)`；行 `rows` 由转置得到，`cols[i] !== rows[i]` 时**直接 throw**（`:58-60`）——
+- 列 `cols = flipMasks(n)`；行 `rows` 由转置得到，`cols[i] !== rows[i]` 时**直接 throw**（`js/core/gf2.js:58-60`）——
   第 5 节的不可解证书依赖对称性，对称一破证书就悄悄不再是证书，所以这里宁可崩。
-- 对每一列做带回溯的消元（`:64-78`）：碰到没有主元的余式就是新主元列（记进 `pivots`），否则那条 `comb ^ (1<<j)`
+- 对每一列做带回溯的消元（`js/core/gf2.js:64-78`）：碰到没有主元的余式就是新主元列（记进 `pivots`），否则那条 `comb ^ (1<<j)`
   就是**核向量**（press 空间里 `M·y = 0` 的非零 `y`）。核基大小 = `nullity = size - rank`。
-- 预先把**整个解陪集** `2^nullity` 个元素算出来（`:81-86`）。
+- 预先把**整个解陪集** `2^nullity` 个元素算出来（`js/core/gf2.js:81-86`）。
 
-`minPresses(board)`（`:133`）：
+`minPresses(board)`（`js/core/gf2.js:133`）：
 
 ```
 {rem, comb} = reduce(board)        // 不变式 rem === board ⊕ M·comb

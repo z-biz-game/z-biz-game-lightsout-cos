@@ -267,6 +267,8 @@ for (const m of ciRows) {
 // 纯标点（`，`、`、`）隔开的那个名字只是列表的上一项，不构成指认。
 // 输入集从目录现数：老写法只读 README+DESIGN，deliverable.md 那 13 条引用一直没人看，
 // 而闸照样打印"全部在范围内"——手抄的名单会让这条腿自己缩样。
+// 除 `path:NN` 之外还认**续引**（完整引用后面只写行号）：它只向同一句里最近的那条完整引用借出处，
+// 句号/分号/空行/新标题都截断这次借；借不到出处的一条也不静默跳过，而是计入页面上那个「无法定址」。
 {
   const docFiles = readdirSync(ROOT).filter((f) => f.endsWith('.md'));
   ok(docFiles.length >= 3, 'D9a 本仓根下有三份以上的文档可审（闸的输入集不许自己空掉）', docFiles.join(','));
@@ -275,6 +277,23 @@ for (const m of ciRows) {
 
   const PATH_SRC = '[\\w./-]+?\\.(?:js|mjs|cjs|sh|json|yml|html|css)';
   const CITE = new RegExp('^(' + PATH_SRC + '):([0-9]+(?:[,-][0-9]+)*)$');
+  // 续引：完整引用后面只写行号——`js/core/grid.js:57`（`applyPress`）之后再写 `:61`。本仓三份文档里
+  // 这种写法不少（条数由 D9k/D9l 两行现数并钉住，所以这条注释里不写数），而这条腿以前只认 `path:NN`，
+  // 于是它报"全部在范围内"时其实只看了文档的一部分。
+  // 借规则：只向**同一句里最近的那条完整引用**借出处；句号、空行、新标题都截断这次借。
+  // 正文里提到一个文件名不构成出处：宁可计入「无法定址」，也不要在错的文件上判绿（判绿比判红糟）。
+  const BARE = /^:([0-9]+(?:[,-][0-9]+)*)$/;
+  const STOP = /[。！？；]/;
+  const inheritedPath = (text, spans, i) => {
+    for (let j = i - 1; j >= 0; j--) {
+      const pc = spans[j].body.match(CITE);
+      if (!pc) continue;
+      const between = text.slice(spans[j].end, spans[i].s);
+      if (between.includes('\n') && (STOP.test(between) || /\n[ \t]*\n/.test(between) || /\n#{1,6} /.test(between))) return null;
+      return { path: pc[1] };
+    }
+    return null;
+  };
   // 锚点可以是成员路径（`view.cellCenter`），但不许是文件路径：body 里带 `/` 的那一类是另一条引用。
   const ID = /^[A-Za-z_$][A-Za-z0-9_$]{2,}(?:\.[A-Za-z_$][A-Za-z0-9_$]+)*$/;
   const tokOf = (body) => {
@@ -307,7 +326,7 @@ for (const m of ciRows) {
     }
     return lineCache.get(p);
   };
-  function parseRefs(text) {
+  function parseRefs(text, orphans = null) {
     const spans = [];
     const spanRe = /`([^`\n]+)`/g;
     let m;
@@ -315,7 +334,10 @@ for (const m of ciRows) {
     const out = [];
     for (let i = 0; i < spans.length; i++) {
       const c = spans[i].body.match(CITE);
-      if (!c) continue;
+      const bare = c ? null : BARE.exec(spans[i].body);
+      if (!c && !bare) continue;
+      const owner = c ? { path: c[1] } : inheritedPath(text, spans, i);
+      if (!owner) { if (orphans) orphans.push(bare[0]); continue; }
       let anchor = '';
       let consumed = false;
       const next = spans[i + 1];
@@ -333,15 +355,18 @@ for (const m of ciRows) {
         const shaped = /^[（(]/.test(gT) || /[\w一-鿿]/.test(gT);
         if (shaped && !/\s/.test(prev.body) && gap.length <= 4 && !gap.includes('\n')) anchor = tokOf(prev.body);
       }
-      for (const seg of c[2].split(',')) {
+      // 续引只借路径——它自己印的那些数字才是文档的主张。
+      const range = c ? c[2] : bare[1];
+      for (const seg of range.split(',')) {
         const parts = seg.split('-').map(Number);
-        out.push({ path: c[1], from: parts[0], to: parts[parts.length - 1] || parts[0], anchor });
+        out.push({ path: owner.path, from: parts[0], to: parts[parts.length - 1] || parts[0], anchor, cont: !c });
       }
     }
     return out;
   }
   const audit = (text) => {
-    const refs = parseRefs(text);
+    const orphans = [];
+    const refs = parseRefs(text, orphans);
     const outOfRange = [];
     const anchorBad = [];
     for (const r of refs) {
@@ -364,7 +389,7 @@ for (const m of ciRows) {
       if (!lines) outOfRange.push(`${k[1]}（${k[2]} 行）文件不存在`);
       else if (lines.length !== +k[2]) outOfRange.push(`${k[1]} 实测 ${lines.length} 行，文档写的是 ${k[2]}`);
     }
-    return { refs, outOfRange, anchorBad };
+    return { refs, outOfRange, anchorBad, unaddressed: orphans.length };
   }
   const A = audit(docText);
   const anchored = A.refs.filter((r) => r.anchor).length;
@@ -384,6 +409,58 @@ for (const m of ciRows) {
       'D9e 文档里每一处「解析 N 条」都等于这条腿自己数到的（删掉这个数字同样算红）',
       `闸数到 ${A.refs.length} · 文档写了 ${claims.length} 处：${[...new Set(claims)].join('/') || '（一处都没写）'}`);
   }
+
+  // 「认到锚点 N 条」同样是印在页面上的现值：续引会带来新的锚点，这个数一漂就得红。
+  {
+    const aClaims = [...docText.matchAll(/认到锚点 (\d+) 条/g)].map((x) => +x[1]);
+    ok(aClaims.length >= 1 && aClaims.every((c) => c === anchored),
+      'D9t 文档里每一处「认到锚点 N 条」都等于这条腿自己数到的（删掉这个数字同样算红）',
+      `闸数到 ${anchored} · 文档写了 ${aClaims.length} 处：${[...new Set(aClaims)].join('/') || '（一处都没写）'}`);
+  }
+
+  // 续引在这三份文档里到底借到了没有：一条也没有就是这条规则在自己仓里空转。
+  const contRefs = A.refs.filter((r) => r.cont).length;
+  ok(contRefs >= 1 && contRefs < A.refs.length, 'D9k 三份文档里确有续引在同句内借到了出处（一条也没有就是这条规则空转）',
+    `解析 ${A.refs.length} 条 · 其中续引借到出处 ${contRefs} 条`);
+  // 借不到的不当错误、也不静默跳过：数出来写进页面，再由这一条钉住——新增一条定不了址的引用会把闸打红，
+  // 而不是让覆盖面悄悄缩水。
+  {
+    const gapClaims = [...docText.matchAll(/无法定址 (\d+) 处/g)].map((x) => +x[1]);
+    ok(gapClaims.length >= 1 && gapClaims.every((c) => c === A.unaddressed),
+      'D9l 文档里每一处「无法定址 N 处」都等于这条腿数到的借不到出处的续引（删掉这个数字同样算红）',
+      `闸数到 ${A.unaddressed} · 文档写了 ${gapClaims.length} 处：${[...new Set(gapClaims)].join('/') || '（一处都没写）'}`);
+  }
+
+  // 续引的七把控制腿，全在内存里、一个字不碰盘上的文档：借到 / 句尾墙 / 软换行仍算同一句 /
+  // 空行与新标题截断 / 借来的路径喂进边界检查 / 正文里提到的文件名不是出处 / 同一句改写成完整引用就读得回来。
+  const cG = audit('`js/core/grid.js:57`（`applyPress`）、`applyPattern`（`:62`）');
+  ok(cG.refs.length === 2 &&
+    cG.refs.filter((r) => r.cont).length === 1 && cG.unaddressed === 0 &&
+    cG.outOfRange.length === 0 && cG.anchorBad.length === 0 &&
+    cG.refs.every((r) => r.path === 'js/core/grid.js'),
+    'D9m 续引在同句内借到出处，并带上自己那一格的指认',
+    `refs=${cG.refs.length} 红=${[...cG.outOfRange, ...cG.anchorBad].join(' | ') || '无'} 借不到=${cG.unaddressed}`);
+  const cW = audit('`js/core/grid.js:57`（`applyPress`）。\n`applyPattern`（`:62`）');
+  ok(cW.refs.length === 1 && cW.unaddressed === 1, 'D9n 句号把借的窗口关上：下一句的续引不许挂到上一句的出处上',
+    `refs=${cW.refs.length} 借不到=${cW.unaddressed}`);
+  const cP = audit('`js/core/grid.js:57`（`applyPress`）、\n`applyPattern`（`:62`）');
+  ok(cP.refs.length === 2 && cP.unaddressed === 0, 'D9o 软换行不算换句：同一句折行后续引照样借得到',
+    `refs=${cP.refs.length} 借不到=${cP.unaddressed}`);
+  const cH = audit('`js/core/grid.js:57`（`applyPress`）\n\n## 续\n`applyPattern`（`:62`）');
+  ok(cH.refs.length === 1 && cH.unaddressed === 1, 'D9p 空行与新标题同样截断这次借',
+    `refs=${cH.refs.length} 借不到=${cH.unaddressed}`);
+  const cB = audit('`js/core/grid.js:57`（`applyPress`）、`applyPattern`（`:99999`）');
+  ok(cB.outOfRange.length === 1 && cB.outOfRange[0].includes('js/core/grid.js'),
+    'D9q 借来的路径喂进边界检查：续引写一个越界的行号必须红，并点名被借的那个文件',
+    cB.outOfRange.join(' | ') || '（没红）');
+  const cF = audit('这一族全在 `gf2.js` 里，`getSolver`（`:53`）');
+  ok(cF.refs.length === 0 && cF.unaddressed === 1,
+    'D9r 正文里提到的文件名不是出处：这种写法必须算借不到，而不是在错的文件上判绿',
+    `refs=${cF.refs.length} 借不到=${cF.unaddressed}`);
+  const cC = audit('这一族全在 `gf2.js` 里，`getSolver`（`js/core/gf2.js:53`）');
+  ok(cC.refs.length === 1 && cC.unaddressed === 0 && cC.anchorBad.length === 0,
+    'D9s 同一句改写成完整引用就读得回来：D9r 红的是写法，不是解析器漏了这一句',
+    `refs=${cC.refs.length} 借不到=${cC.unaddressed} 红=${cC.anchorBad.join(' | ') || '无'}`);
 
   // 反空转：七把假引用必须一把不落——文件不存在、行号越界、四种写法各自的锚点漂、行数写错。
   const F = audit('出处 `js/core/nope.js:1`、`server.cjs:99999`、`NO_SUCH_ANCHOR` 在 `server.cjs:48`、' +
