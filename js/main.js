@@ -327,20 +327,6 @@ function fullscreenElement() {
 
 // 全屏按钮是 HUD 上真实存在的 #fullscreen；iOS Safari 没有元素级 requestFullscreen，
 // 拿不到就退回"提示用户用系统手势"，而不是引用一个不存在的 id 假装按过了。
-function toggleFullscreen() {
-  const root = document.documentElement;
-  if (fullscreenElement()) {
-    const exit = document.exitFullscreen || document.webkitExitFullscreen;
-    if (exit) return Promise.resolve(exit.call(document)).catch(() => {});
-    return Promise.resolve();
-  }
-  const request = root.requestFullscreen || root.webkitRequestFullscreen || root.requestFullscreenWithOptions;
-  if (!request) {
-    dom.hintline.innerHTML = '<span class="answer-line">这个浏览器不支持网页全屏，请用系统的显示方式切换</span>';
-    return Promise.resolve();
-  }
-  return Promise.resolve(request.call(root)).catch(() => {});
-}
 
 function openHelp() {
   state.helpOpen = true;
