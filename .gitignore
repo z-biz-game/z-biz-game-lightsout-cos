@@ -4,3 +4,6 @@ node_modules/
 dist/
 .electron-cache/
 _site/
+_sabotage-copy/
+_tmp-verify/
+_scratch/

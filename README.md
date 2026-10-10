@@ -74,7 +74,8 @@ blackout 包络 11–15，落在 11–14。两者并排存着、各测一次，`
 ## 承诺表：每条承诺都指着会让它红的那条命令
 
 左列是本仓对外说的话，中列是**本轮真的跑过、并且真的能让它红**的命令，右列是这次的实际读数。
-本轮（2026-09-30）所有读数都来自这个 checkout（`git ls-files | wc -l` = 38，含本轮新增的那条用例）。
+本轮（2026-10-03）所有读数都来自这个 checkout（`git ls-files | wc -l` = 52：本轮新增的那条闸
+`tools/doctest.mjs`、那台台账 `tools/sabotage.py`，以及部署集闸留下的那三份文件）。
 
 | 承诺 | 会让它红的命令 | 它到底在比什么 | 本轮实测 |
 |---|---|---|---|
@@ -88,6 +89,8 @@ blackout 包络 11–15，落在 11–14。两者并排存着、各测一次，`
 | `hashSeed` 不是教科书 FNV-1a（它是分享链接稳定的地基） | `node test/rng.test.mjs` | 每字符两轮 UTF-16 混合的**逐位期望值**，另把游戏用到的每颗 seed 钉到第二套实现 | `rows: 10 fail: 0`（这一套就占了 11981 次断言）；第 6 枪（抹掉第二轮）红在 `two rounds per character: a variant, and knowingly not textbook FNV-1a` |
 | 生成器只出货"带内、可解、不重复"的盘 | `node test/make.test.mjs` | 拒绝原因词表必须**恰好**是 `bake.mjs` 打印的那四个，多一个少一个都算红 | `rows: 8 fail: 0`；第 10 枪（dim 的窗口放宽到 `[4,9]`）红在 `the ladder is four bands, each with a key dial and a measured par window` |
 | 每一关都能用真鼠标点完、点数与星级都对 | `bash tools/verify.sh` 的 `@pointer` | CDP `Input.dispatchMouseEvent` 发**真**事件，坐标取自 `js/view.js` 的 `cellCenter()`，从不叫 `window.lights` 代劳 | `rows: 21 fail: []`；全程 `(no console output)` |
+| **本文印的每一个数都还等于现在的代码**（秩表、四带表、包络与落点、套件分账、腿清单、端口、脚本清单、CI 步、行号引用、追踪文件数） | `node tools/doctest.mjs` | 一组等式，每一条都配一句"解析到了几行"的反空转断言：正则没命中不是绿，是红；套件分账那一档是**真的把 9 套现跑一遍**再比文档。这条闸自己有几行等式不在本文里印（加了断言就会漂），它由命令自己打印，见门禁清单 | 见下面门禁清单的「文档闸」那一行；台账 L14–L22 九把刀逐条证明它咬得动，L23–L25 三把证明它不把散文当数，L32 证明行号漂到隔壁一行也会红 |
+| 上面这条闸不是装饰品：它自己有一把刀，砍掉"有人在跑它"就红 | `python3 tools/sabotage.py` 的 L26–L29 | 在副本里分别摘掉 CI 的台账步、CI 的文档闸步、`package.json` 的 `sabotage` 脚本、README 里那句指向台账的话 | 四把都红在 `D12` 那条接线断言上，打印 `ci=缺 · pkg=在 · readme=在 · knife=在` 这样的分账（只缺一处、其余在位）|
 | 一个语法错的文件不许上线 | CI 的 `Syntax` 步（`.github/workflows/ci.yml:24-25`），本地 `npm run check` | 对 `js/**`、`server.cjs`、`electron/main.cjs`、`tools/*.mjs`、`test/*.mjs` 逐个 `node --check` | `npm run check` → `OK`（本轮展开成 26 个文件） |
 
 node 层合计本轮 **`rows: 94 / asserts: 21151 / fail: 0`**（9 个套件，见下面门禁清单的加总）；
@@ -95,32 +98,134 @@ node 层合计本轮 **`rows: 94 / asserts: 21151 / fail: 0`**（9 个套件，�
 
 ## 破坏试验：把每条承诺真的破坏一次
 
-台架在仓库外的副本上做（`_tmp-lightsout-copy/`，用完即删，真仓一行没改）：每枪只改**一个字段**，
-替换前先断言 needle 在目标文件里恰好出现一次，否则当场中止；然后跑点名的套件，要求它**红，并且红在
-预期的那条用例名上**。另有两枪是"不该红"的——它们证明台架不是在把所有改动一律判红。
-脚本：工作区根 `_tmp-lightsout-sab.py`，日志 `_tmp-lightsout-sab.log`，末行 `=== 判定 13 枪 / 与预期不符 0 ===`。
+台账住在仓里（`tools/sabotage.py`，`npm run sabotage`，CI unit job 里名为 `Ledger trips the assertion each knife names` 的那一步）。它在**仓库里的一个副本**
+上动刀（`_sabotage-copy/`，已 gitignore，跑完 `shutil.rmtree` 删掉，真仓一行没改），每把刀只改**一个字段**：
+替换前先断言 needle 在目标文件里恰好出现一次，打不中就报 `ERROR` 并计入不符——针打不中却写上一句"通过"，
+是台账最坏的一种绿。然后跑它点名的套件/闸，要求**红，并且红在它点名的那条断言名上**（认的是 `FAIL` /
+`未过：` 那行的**原文全等**，转述不算点名）。跑刀之前先把未破坏的副本整套跑一遍当基线，基线有红就直接退出 2：
+否则后面每一枪的"红"都没有对照。共 **32 把**：11 把咬代数与引擎，2 把是产品侧"不该红"的对照（配色与文案），
+10 把咬本文印的数，3 把是文档侧"不该红"的对照（改散文不许红），6 把咬"这条闸到底有没有人在跑"。
 
-| # | 破坏 | 结果 |
-|---|---|---|
-| 1 | `gf2.js` 的陪集比较改成 `if (false)`（只认第一个候选） | 红 4 条，点名 `full sweep: coset minimum equals BFS distance…` |
-| 2 | 不可解证书一律 `return null` | 红 2 条，点名 `a board nobody can solve is reported as unsolvable…` |
-| 3 | `neighbours()` 少掉自己那一格 | 红 4 条，点名 `the cross neighbourhood is what the rules say it is` |
-| 4 | `grade` 把三星线挪到 `par+1` | **改之前这一枪全绿**；补了边界用例之后，红 1 条：`三星的线正落在 par 上：多按一手就退成两星` |
-| 5 | 存档 `best` 改成留最差 | 红 3 条，点名 `best only goes down, perfect is sticky, plays only counts` |
-| 6 | `hashSeed` 退回每字符一轮（教科书那副 FNV-1a） | 红 2 条，点名 `two rounds per character…` |
-| 7 | 手改 `lots.js` 里一关的 `par`（2 → 3） | 红 6 条，点名 `every printed par reproduces from the serialised board` |
-| 8 | `TIERS_META` 把 dim 上界从 5 写成 7 | 红 1 条：`the bands on screen are the bands in the file` |
-| 9 | 每日选盘改成恒定第 0 关 | 红 1 条：`a shared pick is the same pick…` |
-| 10 | 生成窗口 dim 放宽到 `[4,9]` | 红 1 条：`the ladder is four bands…` |
-| 11 | `isSolvable` 一律返回 `true` | 红 1 条：`isSolvable agrees with solve, including on the boards that are not` |
-| 12 | （**不该红**）改灯光的颜色常量 `--lamp` | 无 —— 配色不是承诺，没有用例读 CSS |
-| 13 | （**不该红**）换掉首页那句存档说明的一个词 | 无 —— 文案不是承诺；用例只查 `blurb` 里有没有"按"字 |
+| 刀 | 破坏 | 跑什么 | 结果 |
+|---|---|---|---|
+| L1 | `gf2.js` 的陪集比较改成 `if (false)`（只认第一个候选） | `gf2-vs-bfs` + `library` | 红 4 条，点名 `full sweep: coset minimum equals BFS distance on all 65536 boards` |
+| L2 | 不可解证书一律 `return null` | `gf2` | 红 2 条，点名 `a board nobody can solve is reported as unsolvable, with a checkable certificate` |
+| L3 | `neighbours()` 少掉自己那一格 | `grid` | 红 4 条，点名 `the cross neighbourhood is what the rules say it is` |
+| L4 | `grade` 把三星线挪到 `par+1` | `game` | **补用例之前这一枪全绿**；红 1 条：`三星的线正落在 par 上：多按一手就退成两星` |
+| L5 | 存档 `best` 改成留最差 | `storage` | 红 3 条，点名 `best only goes down, perfect is sticky, plays only counts` |
+| L6 | `hashSeed` 退回每字符一轮（教科书那副 FNV-1a） | `rng` + `library` | 红 2 条，点名 `two rounds per character: a variant, and knowingly not textbook FNV-1a` |
+| L7 | 手改 `lots.js` 里一关的 `par`（2 → 3） | `library` | 红 6 条，点名 `every printed par reproduces from the serialised board` |
+| L8 | `TIERS_META` 把 dim 上界从 5 写成 7 | `library` | 红 1 条：`the bands on screen are the bands in the file` |
+| L9 | 每日选盘改成恒定第 0 关 | `library` | 红 1 条：`a shared pick is the same pick, and it is the pick the URL promises` |
+| L10 | 生成窗口 dim 放宽到 `[4,9]` | `make` | 红 1 条：`the ladder is four bands, each with a key dial and a measured par window` |
+| L11 | `isSolvable` 一律返回 `true` | `solve` | 红 1 条：`isSolvable agrees with solve, including on the boards that are not` |
+| L12 | （**不该红**）改一盏灯的灯光颜色常量 `--lamp` | 全部 9 套 + 文档闸 | 无 —— 配色不是承诺，没有任何命令读 CSS 的那个字节 |
+| L13 | （**不该红**）换掉首页那句存档说明的一个词 | 全部 9 套 + 文档闸 | 无 —— 文案不是承诺 |
+| L14 | 文档印的追踪文件数比仓里少一个（52 → 51） | `tools/doctest.mjs` | 红 1 条：`D10 文档说的追踪文件数等于 git ls-files 现在的数（新增一个文件要一起改文档）` |
+| L15 | 分账表把 `grid` 的 asserts 手抄成一个邻近的数（5077 → 5078） | 同上 | 红 1 条：`D4 grid 现跑 rows 11 / asserts 5077：文档那两格等于现测` |
+| L16 | 四带表把昏黄的实测 par 区间写宽一格（4–5 → 4–6） | 同上 | 红 1 条：`D2 dim 那一行等于 summaryTable() 的现量（关数 / par / 中位 / 亮格 / 旋钮）` |
+| L17 | 浏览器表少写一条腿（删掉 `@pointer` 那一行） | 同上 | 红 2 条：`D5a`（少一行）与 `D5b`（腿名集合不再等于 verify.sh 的那五条） |
+| L18 | 端口表把 `WEB_PORT` 抄成 5191 | 同上 | 红 1 条：`D6 文档端口表等于 verify.sh 与 server.cjs 的默认值（换端口要三处一起换）` |
+| L19 | 脚本清单少写一条 script | 同上 | 红 1 条：`D7 文档脚本表覆盖 package.json 的每一条（多一条少一条都红）` |
+| L20 | 秩表把 4×4 的零度抄成 5 | 同上 | 红 1 条：`D1 4×4 秩 12 / 零度 4：文档那行等于锚点也等于现算` |
+| L21 | 一条行号引用指到文件末尾之外（`game.js:83-88` → `8300-8800`） | 同上 | 红 1 条：`D9 文档里的每条 path:NN 引用都落在真实文件的行数内（写了行号就得还在文件里）` |
+| L22 | CI 覆盖表声称有一条根本不存在的步 | 同上 | 红 1 条：`D8 python3 tools/sabotage.py 由 unit job 的「A step nobody wrote」这一步真的跑到` |
+| L23 | （**不该红**）把一个小节标题换一个说法 | `tools/doctest.mjs` | 无 —— 标题不是数，闸不认它 |
+| L24 | （**不该红**）在四带表后面补一句解释（表里每个数都没动） | 同上 | 无 —— 闸只认表格与等式里的数，多一行散文不该红 |
+| L25 | （**不该红**）把"设计细节另见"换个说法 | 同上 | 无 |
+| L26 | 摘掉 CI 里跑台账的那一步 | 同上 | 红 2 条：`D8 python3 tools/sabotage.py 由 unit job 的「Ledger trips the assertion each knife names」这一步真的跑到`（工作流里没有这一步）+ `D12`（打印 `ci=缺 · pkg=在 · readme=在 · knife=在`） |
+| L27 | 摘掉 CI 里跑文档闸的那一步 | 同上 | 红 2 条：`D8 node tools/doctest.mjs …`（工作流里没有这一步）+ `D12`（`doctest_ci=缺`，其余五处在） |
+| L28 | 摘掉 `package.json` 的 `sabotage` 脚本 | 同上 | 红 2 条：`D7 文档脚本表覆盖 package.json 的每一条`（README 还写着这条）+ `D12`（`pkg=缺`） |
+| L29 | 把 README 里所有指向台账的话改掉（本轮七处一起） | 同上 | 红 1 条：`D12`（`readme=缺`，其余六处在）。这把用的是 `edit_all`：只改一处不会让那根线断，针数不对就当打不中 |
+| L30 | 本地那道门的 `LOGIC_EXPECTS` 把 doctest 钉小 2 | 同上 | 红 1 条：`D13b`（打印 `钉 69 · 实跑 71`）。钉改小一条就够——门看见的是"闸变窄了"，不是"这次没跑到" |
+| L31 | 摘掉 `tools/verify.sh` 里跑文档闸的那一行调用 | 同上 | 红 1 条：`D13d`（打印 `node 套件=1 · doctest=0 · sabotage=1`）。注释里提一句路径不算调用，这一条正是为了让"注释里写了"蒙不过去 |
+| L32 | 把本文那条 `applyPress` 的行号引用挪歪一格（57 → 58，还在文件里，越界检查看不见） | 同上 | 红 1 条：`D9c 贴着引用的那个名字真的出现在被指的那几行里（行号漂到隔壁一行要红）` |
 
-第 4 枪值得单独说：原来的 `test/game.test.mjs` 只测了 `par`（三星）、`par+2`（两星）和一个远超的
+第 4 把值得单独说：原来的 `test/game.test.mjs` 只测了 `par`（三星）、`par+2`（两星）和一个远超的
 情形（一星），**`par+1` 那一档一次都没碰过**。于是"多按一手照样给三星"这个 bug 在门禁上是隐形的。
 补的用例是摆状态给 `grade` 看的（而不是真去打这么一局）：出货盘上按不出"par+1 手就赢"——4×4 最轻的
 非空 quiet pattern 要 8 个键，赢局的按键数只会从 `par` 直接跳到 `par+6` 往上——但 `grade` 是外壳随时
 会调的纯函数，它那条线必须自己有用例。这也顺带把本文开头那句 `par+1`~`par+2` = ★★ 钉成了可测的事。
+
+第 14–22 把是本轮新添的那一档：它们不改任何一行产品代码，改的是**本文自己印的字**。
+在这一档之前，"文档抄错了数"这件事在这个仓里没有任何命令会失败——秩表、四带表、分账表、端口表
+都可以一路抄到和代码无关。现在这九个数各有其一，而且第 23–25 把钉住反面：闸不许把散文也当数。
+
+**这一轮台账把自己的三个洞咬出来了**（第一遍跑就是 13 把不符，每一把都改了台架或闸，没有一把是
+靠"期望改一改"糊过去的）：
+
+1. 副本目录原来叫 `_sabotage-copy/repo/`，于是 `D6b`（Pages 前缀 == 仓名）在**未破坏的基线**上就红——
+   台架直接拒绝跑刀（基线红则 `exit 2`）。现在副本沿用真仓的目录名。
+2. 点名用的是**全等**，可 `harness.mjs` 印的是 `  FAIL 名字`，正则抓到的名字带一个前导空格，
+   于是 11 把引擎刀全部报"红但没点名"。这不是刀不咬，是台账读错了自己的证据——修的是抓取，不是期望。
+3. `D9` 为了不把 `{grid,gf2,solve}.js` 这种花括号列举当成引用，把"前面是全角括号"的引用一起丢了，
+   于是 L21（行号越界）该红却没红。现在只丢"没有目录分隔符且前面是逗号或花括号"的那种，
+   被检查的行号引用从 10 条涨到 25 条——这 15 条之前是没人看的。
+
+跑刀之前还有一道**预检**：32 把的 needle 先在未破坏的副本上逐一点数，对不上就一枪不跑、退出码 3，
+并把每一条"现数 ≠ 期望"打印出来。它不是省时间（虽然确实省掉一整轮刀），它防的是**静默降级**：
+一把针打不中的刀如果只报一句"跑不动"，下一次读台账的人看到的就是一个不再存在的证据。
+本轮加完预检立刻抓到一次：L29 的针是"指认台账的那句话在本文出现几次"，我给文档补了新句子，针数就跟着漂——
+预检在开头把"现数 ≠ 期望"报出来，而不是跑到第 31 把才发现针数不对。
+预检自己也要能被证明会拦：在仓库外的副本里把 L29 的期望针数改大一个再跑，它退 3、一把刀都没跑、副本照样删掉
+（跑法 `_tmp-lightsout-preflight-check.sh`，读数 `_tmp-lightsout-preflight-r1.log`，末行 `PREFLIGHT_RC=3`）。
+
+第 26–31 把是接线刀。一把刀从没被 CI 跑过、一份闸从没被任何命令调用，和它不存在是同一件事，
+所以这条接线（CI 的两步、`package.json` 的两条脚本、README 的那句指认）自己也得有一把能让它红的刀。
+六把都只动**一处**：只摘 CI 那一步就够让 `D12` 红，另外三处还都写着"有人在跑"。
+
+第 30–31 把钉的是**家门口的那道门**。CI 的 unit job 一直有跑文档闸与台账的两步，而本地那道
+`bash tools/verify.sh` 以前一道逻辑闸都不跑——于是"本地全绿"和"CI 会绿"是两套眼睛，
+改闸的人在自己机器上看不见它在 CI 里红的那一条。现在门也在家门口：它按脚本里 `LOGIC_EXPECTS`
+那一行的两颗钉跑，而且 **`rc=0` 不算过**——闸变窄（明天有人删掉二十条断言）剩下的照样绿、
+整道门照样 exit 0，所以钉的是每道闸自己的条数。这两颗钉不能自己证明自己，
+`doctest` 的 `D13a`–`D13e` 反过来核对它从 `verify.sh` 读到的那一行（解析到几颗钉、本闸实跑几项、
+台架现数几把刀、三道闸各有一条**真调用**、README 抄的那两个读数），L30/L31 再证明这一组真的会红。
+CI 那一遍用 `SKIP_UNIT=1` 跳过这一段（那三步在 unit job 里各自是独立一步），
+所以同一道门在两边跑的**是同一条**逻辑，而不是两份清单。
+逐把的读数写在仓内的 `_tmp-verify/`（`.gitignore` 挡着），跑完不留第二棵树。
+
+**文档行号这条腿这一轮换成了 fleet 同源的规则**（`tools/doctest.mjs` 的 `D9a`–`D9j`）。两处升级：
+输入集从目录现数（以前只读 README+DESIGN，`deliverable.md` 里那 13 条引用一直没人看，而闸照样打印"全部在范围内"），
+以及越界之外还要认**锚点**——贴着引用写在反引号里的那个名字，必须真的出现在被指的那几行里。
+只查越界抓不住"漂到隔壁一行"，本轮清出来的两条全都稳稳在界内：`server.cjs:48` 那行是 `port = 5190` 这个默认参数，
+`PORT` 环境变量在 `server.cjs:59`；`deliverable.md` 里"改盘面唯一入口"那条曾写作 `js/main.js:33-42`，
+而 `press` 实际在 `js/main.js:278`。两种都改成了各自指到的那一行，文档没有顺手把检查改宽。
+五种贴法都认：`applyPress`（`js/core/grid.js:57`）这种前后两向、`path:NN` 的 `name`、`fn(a, b)` 的调用形式、
+`dir/file.js::symbol` 的符号形式；带空格的命令行 body（`npm run doctest`）与纯标点间隔（`，`、`、`）不构成指认，
+按它们钉只会造出假红。它还读**续引**：完整引用后面光写几个数字的那种写法，本仓文档里成片都是这么写的，
+以前一条也没被读过——那条腿报"全部在范围内"时其实只看了文档的一部分。借规则是只向**同一句里最近的那条完整引用**
+借出处：句号、分号、空行、新标题都会截断这次借；借来的只有路径，行号仍按文档自己印的那些数字审。
+**正文里提到一个文件名不构成出处**：宁可计入「无法定址」，也不要在错的文件上判绿（判绿比判红糟）。
+DESIGN 开头几节里那些出处本来就唯一可辨的续引，这轮改写成了完整引用，这一格才第一次把它们读回来。
+本轮这条腿解析 62 条、认到锚点 14 条、另有无法定址 11 处，三个数都写在这一行、由同一条腿逐条钉住（D9e / D9t / D9l）；
+控制一把不落：
+九把假引用逐把点名（多出来的一把：无锚点引用整段落在空行上——行号在界内也指不到东西；空行靶子的行号
+当场从 `server.cjs` 数出来、不写死常量，所以那位子哪天被填上内容这一把会连着 `blankAt > 0` 一起失效并被抓住。
+最后那一把管**前缀不算整词**：靶子是"坐在 `applyPress` 声明那一行上写 `applyPres`"这种写法，
+子串算命中、整词不算，所以这一把正是所有候选里最先哑掉的那一把）、
+五种真注解判绿、模板前缀那条规则一绿一红、逗号写法必须判绿，
+七把续引的控制腿（同句借到并带上自己的指认 / 句号墙 / 软换行仍算同一句 / 空行与新标题截断 /
+借来的路径喂进边界检查 / 正文提及不是出处 / 同一句改写成完整引用就读得回来），
+最后一把毒针只在内存里把一条真引用的行号挪歪一格（盘上的文档一个字不动）。
+空行那一把另有一次性的牙齿证明（`_tmp-lightsout-blank-teeth.log`，判词 `TEETH_OK`：在 `_scratch/` 下的**副本**里
+把 DESIGN 中一条界内、当前不落在空行的真引用改指到 `server.cjs` 的那条空行上——副本动刀之前自己就是绿的，
+动刀后 rc 1 且只有数引用那一条断言红、红行点名「整段是空行」，而条数 / 锚点数 / 无法定址那三条读数断言照旧绿
+（所以那条红不是计数漂出来的）；把那一行改回去 rc 回 0。副本目录与仓同名并带上 `.git`（这条腿读 `git ls-files`
+与目录名，少了这两样先替刀红），盘上的仓一个字没改，副本跑完即删）。
+锚点比的是**整词**而不是子串：名字两侧不许再是标识符字符（字母、数字、`_`、`$`）。旧口径查的是"这串字符在那几行里"，
+于是 `applyPres` 坐在声明 `applyPress` 的那一行上也算命中，一个短名字会"出现在"任何碰巧含它的标识符里——
+这道比它替掉的那份手抄锚点清单**更弱**，会把一次真的漂读成绿。本仓的锚点全部从文档现推、被解析器限定成标识符形状，
+没有另有一张字面串表，所以这一格换口径没有留下第二处 `.includes`。换口径这一轮三份文档里已有的带指认引用
+一条都没因此变红，上面那三个读数也一格没动：这条腿自己插了行，但本仓没有任何文档按行号引用它（grep 三份文档里
+指向这台闸的行号是零处），所以没有要改回的漂——这道是加严，不是修一处已经存在的漂。
+牙在两双腿上、都跑在与仓同名的 `_scratch/` 副本里（读数与判词写在 `_tmp-lightsout-word-teeth.log`，判词 `TEETH_OK`）：
+A 腿把这条腿的锚点检查改回子串，七十一项里只有"假引用九把全被抓到"那一条红，而它交回的明细正好只剩八把、
+再没有 `applyPres` 那一格——"退回旧口径"这件事本身被抓得住；B 腿把交付报告里那条 `applyPress` 引用的名字截成它的
+前缀，锚点那一格为它红、红行点名「那几行里没有 applyPres」，同一刀只被内存里那根毒针腿再看一次（它把改过的整份
+文档重审一遍，所以是同一处漂的第二次提及，不是第三种失败模式），而解析 / 认到锚点 / 无法定址三档读数照旧绿——
+那条红不是计数漂出来的。改回原文后两双腿都回全绿（副本基线与盘上同一份读数）。
+没有覆盖：`aria-label` 这种带连字符的名字不构成锚点；借不到的那些续引不参与判定，只计入上面那个数。
 
 ## 本地运行与脚本清单
 
@@ -128,19 +233,37 @@ node 层合计本轮 **`rows: 94 / asserts: 21151 / fail: 0`**（9 个套件，�
 node server.cjs            # http://127.0.0.1:5190/  （ES module 需要 origin，file:// 被 CORS 挡）
 ```
 
-`package.json` 里 8 条 script，本轮每条都真跑过，右列是它这次的实际行为：
+`package.json` 里 10 条 script，本轮每条都真跑过，右列是它这次的实际行为：
 
 | script | 命令 | 本轮状态 |
 |---|---|---|
 | `start` / `dev` | `node server.cjs` / `node server.cjs 5190` | 可跑；只绑 `127.0.0.1`（`server.cjs:52`） |
-| `check` | 对 `js/**`、`server.cjs`、`electron/main.cjs`、`tools/*.mjs`、`test/*.mjs` 逐个 `node --check` | `OK`（26 个文件）。它靠 **shell 通配**展开，所以进不了某个目录时是"扫到 0 个文件"而不是报错 |
+| `check` | 对 `js/**`、`server.cjs`、`electron/main.cjs`、`tools/*.mjs`、`test/*.mjs` 逐个 `node --check` | `OK`（27 个文件，含本轮新增的 `tools/doctest.mjs`）。它靠 **shell 通配**展开，所以进不了某个目录时是"扫到 0 个文件"而不是报错 |
 | `unit` | `for f in test/*.test.mjs; do node "$f"; done` | 9 个套件逐个跑，`rows: 94 / asserts: 21151 / fail: 0`。**别改成 `node --test test/`**：node 22（CI 那台）拿到目录参数时一个文件都找不到，只报一条名为 `test` 的失败，看起来像"测试跑了没通过"，其实一道都没跑 |
 | `test` | `npm run check && npm run unit` | 绿 |
 | `bake` | `node tools/bake.mjs` | 本轮**没有跑**（它会重写 `js/data/lots.js`）。它是构建期管线：出题 → 逐关复验 → 4×4 再用按键图 BFS 复核 → 全绿才写文件 |
 | `verify` | `bash tools/verify.sh` | `=== ALL GREEN ===`，退出码 0（本文所有读数都来自这条） |
 | `electron` | `electron .` | 仓库不装 electron，**没跑过**（见"不承诺"） |
+| `doctest` | `node tools/doctest.mjs` | 文档数字闸：把本文印的每一个数与代码、套件、脚本现算的值逐个对账。本轮实测见门禁清单 |
+| `sabotage` | `python3 tools/sabotage.py` | 破坏试验台账：32 把刀逐条证明上面那些闸真能让它们点名的断言红。跑完把 `_sabotage-copy/` 删掉 |
+| `deploy-set` | `node tools/deploy-set.mjs` | 绿：对拷出来的产物提要求（见「上线的到底是哪一批文件」一节） |
+| `deploy-set:selftest` | `node tools/deploy-set-selftest.mjs` | 绿：9 刀逐类打红且点名 + 1 条阴性对照 |
 
-CI 那两条入口（`.github/workflows/ci.yml`）：`unit` job 跑 Syntax + 9 套件（node 22），
+CI 的入口与本地是同一条命令（下表左边那列在终端里一样能跑）。文档里每一行"这条命令由 CI 的
+哪一步跑"都由 D8 拿工作流的原文核对——步名不在那个工作流里，或者那一步跑的不是这条命令，就红：
+
+| 命令 | job | CI 里的那一步 |
+|---|---|---|
+| `npm run check` | unit | `Syntax` |
+| `npm run unit` | unit | `Suites` |
+| `node tools/doctest.mjs` | unit | `Documentation figures` |
+| `python3 tools/sabotage.py` | unit | `Ledger trips the assertion each knife names` |
+| `bash tools/verify.sh` | browser | `Headless playtest` |
+| `node tools/deploy-set.mjs` | unit | `Deploy set gate` |
+| `node tools/deploy-set-selftest.mjs` | unit | `Deploy set gate proves it can fail` |
+
+`unit` job 用 node 22；台账放在 unit 而不是 browser，因为这 32 把刀一把也不碰浏览器
+（它们只点 node 套件与文档闸），而 browser 那步是 `SKIP_UNIT=1`。
 `browser` job 用 `SKIP_UNIT=1 WD_TIMEOUT=240` 跑 `tools/verify.sh`。`.github/workflows/pages.yml` 没有构建步骤，只是 `mkdir _site` 然后拷 `index.html`、`css/`、`js/`
 （`server.cjs`、`electron/`、`tools/`、`test/` 都不上线），`actions/configure-pages@v5` 之后由
 `actions/deploy-pages@v4` 部署。所以线上那份是**文件拷贝**，任何只在 node 侧跑得起来的东西都不会上线。
@@ -158,12 +281,21 @@ CI 那两条入口（`.github/workflows/ci.yml`）：`unit` job 跑 Syntax + 9 �
 | `gf2-vs-bfs` | 10 | 1079 | `storage` | 9 | 69 |
 | `solve` | 10 | 647 | **加总** | **94** | **21151** |
 
+文档闸 `node tools/doctest.mjs` 本轮读数 **`rows: 71 fail: 0`**；带上浏览器现量再跑
+（`node tools/doctest.mjs --measured <json>`）是 **`rows: 77 fail: 0`**，多出来的 6 行就是
+`D5d` 加五条腿的行数对比。这两个数由这条命令自己在末行打印，抄在这里只为对账；它不进上面任何等式，
+因为断言一多这个数就漂——漂了也不算回归。
+
 `rows` 是跑了多少条命名用例，`asserts` 是被钉住的条件数（`tools/harness.mjs` 两个数都打，
 因为"十条用例每条一个断言"不等于十个检查）。注意 `asserts` 的大头在 `rng`（逐流比对）——
 它是**比对次数**，不是"两千多种不同的性质"。
 
 浏览器层由 `tools/verify.sh` 起一个真实 headless Chrome、经 `tools/playtest.mjs`（零依赖 CDP）跑，
-五个套件各自报 `{rows, fail}`，加总是 **`14 + 27 + 14 + 16 + 21 = 92` 行、0 失败**：
+五个套件各自报 `{rows, fail}`，加总是 **`14 + 27 + 14 + 16 + 21 = 92` 行、0 失败**。
+本轮这一层是**重测过的**（临时把 `WEB_PORT` 换成 5192、`CDP_PORT` 换成 9343，读数在 `_tmp-lightsout-verify-r1.log`，
+末两行 `=== ALL GREEN ===` / `VERIFY_RC=0`，`=== console ===` 那段是 `(none)`）：把每条腿的行数写成
+`_tmp-lightsout-measured-103.json` 喂回文档闸，就是上面那条 `rows: 53`，五条 `D5 … 文档 N == 真 Chrome 量到的 N`
+逐条现比——本轮 PWA 与 44×44 命中盒那两改动没有把任何一条腿的条数挪走：
 
 | 套件 | rows | 钉住的东西（照 `tools/playtest.mjs` 里各条 row 名归纳，条数按本轮实测） |
 |---|---|---|
@@ -206,7 +338,7 @@ js/data/lots.js     构建期产物：TIERS_META + 32 行带实测 par 的关卡
 
 | 用途 | 值 | 定义处 |
 |---|---|---|
-| 手工试玩 | `http://127.0.0.1:5190/` | `server.cjs:48,59`（`PORT` 环境变量或 argv[2] 可换） |
+| 手工试玩 | `http://127.0.0.1:5190/` | `server.cjs:48`（`port = 5190` 默认值）、`server.cjs:59`（`PORT` 环境变量或 argv[2] 可换） |
 | 本地复验 | `WEB_PORT=5190`、`CDP_PORT=9341` | `tools/verify.sh:15-16`，可被同名环境变量覆盖 |
 | 页面内路由 | `#/`（战役）、`#/daily`、`#/lot/<id>` | `js/main.js:51-58`，认不出来返回 `mode: 'unknown'` |
 | 线上 | `https://z-biz-game.github.io/z-biz-game-lightsout-cos/` | Pages 带仓名前缀，所以 `css/`、`js/` 一律写相对路径 |
@@ -247,3 +379,49 @@ js/data/lots.js     构建期产物：TIERS_META + 32 行带实测 par 的关卡
 ## License
 
 MIT © 2026 z-biz-game
+
+## 上线的到底是哪一批文件
+
+这个仓没有打包器：站点=一次文件拷贝。以前「拷哪些」写在 `pages.yml` 的 `run:` 里（手抄的几行
+`cp`）。本地 `index.html` 直读仓库根，永远自洽；线上却按那份清单拷，于是页面后来引用的
+`manifest.webmanifest`、`sw.js`、`icons/*` 可能一个都没上去——线上 404，而仓里的引擎测试与
+真浏览器闸全绿，因为它们跑的都是仓库根，没有任何一步在「按清单拷」的那个环境下加载过页面。
+
+现在清单只有一份，住在 `tools/assemble-site.sh`：CI 调它拷 `_site`，本地闸调它拷临时目录，
+然后**对拷出来的产物**提要求（`tools/deploy-set.mjs`）：
+
+- **W 清单与页面同源**：`pages.yml` 里必须真有 `run: bash tools/assemble-site.sh <dir>` 这一行，
+  `ci.yml` 里必须真有 `run: node tools/deploy-set.mjs`。认的是调用那一行，不是文件里出现过这个
+  路径——注释里本来就会写它，只 grep 字符串会被一句散文喂绿。
+- **R 引用可达**：引用不靠手打名单。从 `index.html` 的 `href/src` 出发，凡解析出来是 `.js`/`.css`
+  的就把那一站也扫一遍（CSS 的 `url()`、JS 去掉注释后的 `'./…'` 字面量、`new URL(x, base)` 的两种
+  基、`navigator.serviceWorker.register`、`scope`），`manifest` 的 icons/screenshots/shortcuts 各自
+  的 `src` 也算引用。取径上读不到的那一站本身就是红（读不到＝这一站根本没扫）。每条引用都必须在
+  产物里且非 0 字节；绝对路径单列一条红，因为 Pages 挂在 `/<repo>/` 前缀下会跳出去。
+- **P 位图不许说谎**：`manifest` 声明的 `sizes` 必须等于 PNG IHDR 的真实宽高——文件图标读文件头，
+  内联成 base64 的图标先解码再读同一段。后一条不是可选项：图标可能住在清单里而不是盘上的 `.png`
+  （有的仓另有一条"零二进制文件"的承诺，那条只约束"有没有 .png 这个文件"）；如果 P 段只筛文件名，
+  声明写 512 而真图 192 就一路放行。
+- **钉住两个数**：R 段实际检查的路径条数（`27`）与这一次跑的断言条数（`45`），两个数
+  都钉在 `tools/deploy-set.mjs` 顶部的那对常量里。没改页面却掉了，说明解析断了；删掉一张图标会同时
+  少一条 R10 与那张的 P1/P2，所以两个数一起钉，断言条数能漂就是闸在缩水的信号。这一节故意只写数值、
+  不写那对常量的名字，也不写别仓文档闸的编号：有的仓的文档闸会拿"文档里出现过的同名标识号"回数它
+  自己的条数，还有的会把文档里点到的每个组编号逐个核对"这一轮真的发过"——两道闸共用一个名字，
+  或者在本仓的文档里出现一个本仓没有的组编号，打红的都是不相干的那一边。
+
+`tools/deploy-set-selftest.mjs` 是这两颗钉的阳性证明：它把仓库复制到临时目录，照着每一类断言
+各下一刀（X1 清单不收位图目录 / X2 模块边改名 / X3 CSS 写绝对路径 / X4 `start_url` 绝对 /
+X5 删光 >=512 图标 / X6 少一个必填字段 / X7 声明尺寸与真图不符 / X8 workflow 不调脚本 /
+X9 CI 不跑闸 / X10 是阴性对照——往入口 JS 追加一行只写在注释里的假路径，闸必须仍然绿、条数仍然
+`27`、断言仍然 `45`；X11 og:image 退回相对路径 / X12 og:image 的前缀指向别的 slug /
+X13 内联位图谎报尺寸——只在有靶子时下：X11/X12 要页面上那句 og:image，X13 要清单里真有一段 base64
+图标，没有就打印 SKIP；反过来 X1 没有位图目录可砍时改砍 css，P 段一位都不核时台架直接报靶子不够），
+要求每一刀都让闸**点名**变红。靶子从 `DEPLOY_SET_DUMP=1`
+的出处表现挑（取径真的会读的那支 JS / 那一张 CSS，不写死某一个仓的入口名），所以页面改了、仓与仓
+不同，台架跟着走。
+
+`node tools/deploy-set.mjs` 与 `node tools/deploy-set-selftest.mjs` 就是 CI 跑的那两条命令本身
+（package.json 里的 `deploy-set` / `deploy-set:selftest` 只是同一支脚本的 npm 入口）；本仓的整闸在 `tools/verify.sh` 的 `=== deploy-set ===` 那一段也各跑一次。它们红的时候并进本仓那条出口的退出码——这一条是这么证的：
+把 ci.yml 里那行 `run: node tools/deploy-set.mjs` 砍掉，本仓整闸必须点名红且退出码非 0。
+所以「本地全绿、线上 404 自己的 manifest / sw.js / 图标」这一类坏法在本地就会红。
+
