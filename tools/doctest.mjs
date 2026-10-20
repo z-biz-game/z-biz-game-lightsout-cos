@@ -39,8 +39,8 @@ const SERVER = read('server.cjs');
 const SAB = existsSync(join(ROOT, 'tools/sabotage.py')) ? read('tools/sabotage.py') : '';
 // 追踪清单只取一次：D9 靠它把 `solve.js:18` 这种省了目录的引用对回真文件，
 // D10 用它数仓里有多少文件——两处必须认同一份清单，否则一个漂了另一个还绿。
-const LS = spawnSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' });
-const TRACKED = (LS.stdout || '').trim().split('\n').filter(Boolean);
+const LS = spawnSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8' }); // `-z`：quotepath 会把非 ASCII 文件名包成 "\346…"，条目带引号就再也对不上被引的文件
+const TRACKED = (LS.stdout || '').split('\0').filter(Boolean);
 
 // 单元格里的数：先去掉 **加粗** 与反引号，再取最前面那个整数（`**12**（本轮 +1）` → 12）。
 const num = (s) => {
