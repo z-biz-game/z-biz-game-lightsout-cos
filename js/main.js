@@ -9,6 +9,10 @@ import { createGame, press, undo, reset, boardCells, litCount, grade, answerCell
 import { store, SAVE_KEY } from './core/storage.js';
 import { hashSeed, todayKey } from './core/rng.js';
 import { createView } from './view.js';
+// 听觉与触觉这两路反馈：视觉与数值之外，桌面上还该有"听得见"的一路。
+// 音频模块自己管手势解锁与真静音（suspend），这里只管把音接到引擎的判定上。
+import { audio } from './audio.js';
+import { haptics } from './haptics.js';
 
 const dom = {
   canvas: document.getElementById('panel'),
@@ -42,6 +46,8 @@ const state = {
   game: null,
   showAnswer: false,
   missing: null,
+  // 这一局赢过没有：通关声只响一次（见 settle()）。
+  won: false,
 };
 
 // ---- routing ---------------------------------------------------------------
@@ -76,6 +82,7 @@ function loadLot(lot) {
   state.lot = lot;
   state.game = createGame(lot);
   state.showAnswer = false;
+  state.won = false;              // 上一局赢过不算数：这一局还没赢
   paint();
 }
 
@@ -262,8 +269,18 @@ function paint() {
 
 // ---- the one action --------------------------------------------------------
 
+// 声音接在**引擎的判定**上，不是接在"手指碰过屏幕"上：
+//   · press() 真的翻了盘（引擎收了这一步）→ correct
+//   · press() 返回 null（这局已经收官 / 序号不在盘上）→ wrong
+//   · 这一步之后全灭了（game.done）→ win，而且只响一次
 function settle() {
   const { lot, game } = state;
+  // 通关只响一次：赢过之后玩家还能继续按，按一下重播一遍通关声是吵的。
+  if (!state.won) {
+    state.won = true;
+    audio.play('win');
+    haptics.correct();
+  }
   const rec = store.solve(lot.id, { presses: game.presses, par: lot.par });
   const index = campaignIds().indexOf(lot.id);
   if (index >= 0) store.unlock(index + 2);
@@ -275,19 +292,35 @@ function pressKey(j) {
   const { game } = state;
   if (!game || game.done) return false;
   const before = boardCells(game);
-  if (press(game, j) === null) return false;
+  if (press(game, j) === null) {
+    // 引擎没接这一下：这一按没生效，玩家得听得见。
+    audio.play('wrong');
+    haptics.wrong();
+    return false;
+  }
   const after = boardCells(game);
   const changed = [];
   for (let i = 0; i < after.length; i++) if (after[i] !== before[i]) changed.push(i);
   view.flash(changed);
-  if (game.done) settle();
+  if (game.done) {
+    settle();                      // win 在 settle 里响：这一步只出这一声
+  } else {
+    audio.play('correct');         // 引擎真的翻了盘
+    haptics.correct();
+  }
   paint();
   return true;
 }
 
 function stepBack() {
   if (!state.game) return;
-  if (!undo(state.game)) return;
+  if (!undo(state.game)) {
+    audio.play('wrong');           // 没有可退的一步
+    haptics.wrong();
+    return;
+  }
+  audio.play('move');              // 盘面退了一步
+  haptics.tap();
   paint();
 }
 
@@ -360,12 +393,17 @@ function bind() {
   dom.undo.addEventListener('click', stepBack);
   dom.answerKey.addEventListener('click', () => {
     state.showAnswer = !state.showAnswer;
+    audio.play('move');           // 揭开答案：只说一声，不落子
+    haptics.tap();
     paint();
   });
   dom.restart.addEventListener('click', () => {
     store.noteReset();
     reset(state.game);
     state.showAnswer = false;
+    state.won = false;            // 重开就是新的一局：通关声重新算一次
+    audio.play('move');
+    haptics.tap();
     paint();
   });
   dom.review.addEventListener('click', () => {
@@ -554,3 +592,26 @@ if (document.readyState === 'loading') {
 } else {
   bootFullscreen();
 }
+
+// ---- 音效开关（#btn-sound）----
+//
+// 静音走 `audio.setMuted(true)`，那是 `ctx.suspend()`：整个 AudioContext 挂起。
+// **不许**改成像"把 master.gain 拧到 0"那样 —— 只拧 gain 是假静音：节点照建、时钟照跑，
+// 取消静音之后还有一截尾巴在响。真正的静音必须是挂起整个上下文。
+//
+// 按钮找不到就不装（和全屏那一条同一条纪律）：留一串没人按的代码等于没做这个功能。
+(function bindSound() {
+  const btn = document.getElementById('btn-sound');
+  if (!btn) return;
+  function paint() {
+    const on = !audio.muted;
+    btn.setAttribute('aria-pressed', String(on));
+    btn.textContent = on ? '音效：开' : '音效：关';
+    btn.title = on ? '点击关闭音效' : '点击开启音效';
+  }
+  btn.addEventListener('click', () => {
+    audio.setMuted(!audio.muted);
+    paint();
+  });
+  paint();
+})();

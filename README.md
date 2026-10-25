@@ -190,7 +190,7 @@ CI 那一遍用 `SKIP_UNIT=1` 跳过这一段（那三步在 unit job 里各自�
 以及越界之外还要认**锚点**——贴着引用写在反引号里的那个名字，必须真的出现在被指的那几行里。
 只查越界抓不住"漂到隔壁一行"，本轮清出来的两条全都稳稳在界内：`server.cjs:48` 那行是 `port = 5190` 这个默认参数，
 `PORT` 环境变量在 `server.cjs:59`；`deliverable.md` 里"改盘面唯一入口"那条曾写作 `js/main.js:33-42`，
-而 `press` 实际在 `js/main.js:278`。两种都改成了各自指到的那一行，文档没有顺手把检查改宽。
+而 `press` 实际在 `js/main.js:295`。两种都改成了各自指到的那一行，文档没有顺手把检查改宽。
 五种贴法都认：`applyPress`（`js/core/grid.js:57`）这种前后两向、`path:NN` 的 `name`、`fn(a, b)` 的调用形式、
 `dir/file.js::symbol` 的符号形式；带空格的命令行 body（`npm run doctest`）与纯标点间隔（`，`、`、`）不构成指认，
 按它们钉只会造出假红。它还读**续引**：完整引用后面光写几个数字的那种写法，本仓文档里成片都是这么写的，
@@ -340,7 +340,7 @@ js/data/lots.js     构建期产物：TIERS_META + 32 行带实测 par 的关卡
 |---|---|---|
 | 手工试玩 | `http://127.0.0.1:5190/` | `server.cjs:48`（`port = 5190` 默认值）、`server.cjs:59`（`PORT` 环境变量或 argv[2] 可换） |
 | 本地复验 | `WEB_PORT=5190`、`CDP_PORT=9341` | `tools/verify.sh:15-16`，可被同名环境变量覆盖 |
-| 页面内路由 | `#/`（战役）、`#/daily`、`#/lot/<id>` | `js/main.js:51-58`，认不出来返回 `mode: 'unknown'` |
+| 页面内路由 | `#/`（战役）、`#/daily`、`#/lot/<id>` | `js/main.js:57-64`，认不出来返回 `mode: 'unknown'` |
 | 线上 | `https://z-biz-game.github.io/z-biz-game-lightsout-cos/` | Pages 带仓名前缀，所以 `css/`、`js/` 一律写相对路径 |
 
 `tools/verify.sh:31-35` 在起任何东西之前先探两个端口：DevTools 已经被占（第二台 Chrome 会**静默并进
