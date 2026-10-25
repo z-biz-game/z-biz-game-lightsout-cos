@@ -26,7 +26,11 @@ const PALETTE = {
   good: '#6ee7b7',
 };
 
-const PULSE_SECONDS = 0.5;
+// 脉冲时长（秒）。320ms 落在交互动效 150–350ms 区间内（设计标准 §4 的时长纪律）；
+// 减弱动效时收敛到 0 —— 脉冲这条路整个不存在，不是「幅度归零但还占着一段时间」：
+// 时长是 0 的时候，flash 的那圈描边算出来恒为 0，rAF 也不会被脉冲续着跑。
+const PULSE_SECONDS = 0.32;
+export const pulseSecondsFor = (reduced) => (reduced ? 0 : PULSE_SECONDS);
 
 export function createView(canvas) {
   const ctx = canvas.getContext('2d');
@@ -42,6 +46,8 @@ export function createView(canvas) {
   const reduceMotion = typeof matchMedia === 'function'
     ? matchMedia('(prefers-reduced-motion: reduce)').matches
     : false;
+  // 脉冲时长随系统偏好走：减弱动效时是 0（脉冲这条路不存在），否则 320ms。
+  const pulseSeconds = pulseSecondsFor(reduceMotion);
 
   // ---- geometry ------------------------------------------------------------
 
@@ -155,7 +161,7 @@ export function createView(canvas) {
     const lit = !!cells[i];
     const r = reduceMotion ? 0 : pulse.get(i) || 0;
     const age = r ? (now - r) / 1000 : 1;
-    const flash = age < PULSE_SECONDS ? 1 - age / PULSE_SECONDS : 0;
+    const flash = age < pulseSeconds ? 1 - age / pulseSeconds : 0;
     const inset = q.s * 0.1;
     const box = { x: q.x + inset, y: q.y + inset, s: q.s - inset * 2 };
 
@@ -253,7 +259,7 @@ export function createView(canvas) {
   function needsFrame() {
     if (reduceMotion) return false;
     const now = performance.now();
-    for (const t of pulse.values()) if (now - t < PULSE_SECONDS * 1000) return true;
+    for (const t of pulse.values()) if (now - t < pulseSeconds * 1000) return true;
     return false;
   }
 
