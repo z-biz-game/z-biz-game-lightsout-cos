@@ -11,7 +11,7 @@
 盘面是**一个 `n×n` 位的 BigInt**，bit `i` = 第 `i` 格亮着；按键集合也是同形状的 BigInt，bit `j` = 按第 `j` 个键
 （一格配一键，格 `j` 就是键 `j`）。`js/core/grid.js` 里三条事实撑起整个仓，并且都被 `test/grid.test.mjs` 钉住：
 
-1. **按一个键 = 与一张固定掩码异或**（`applyPress`，`js/core/grid.js:57`），所以它是**自身逆运算**：按两次 = 没按；
+1. **按一个键 = 与一张固定掩码异或**（`js/core/grid.js:57` 的 `applyPress`），所以它是**自身逆运算**：按两次 = 没按；
 2. **异或可交换**，所以决定盘面的**是按了哪些键（集合）**，与按的顺序无关；
 3. 十字邻域掩码 `flipMask(n, j)`（`js/core/grid.js:39`）= 键自己 + 上下左右，被矩形裁剪；`flipMask(n, j)[i] === flipMask(n, i)[j]`，
    即**翻转矩阵 `M` 对称**。
@@ -94,7 +94,7 @@ the bounded graph walk"）。这个"不做全扫"的决定是**写下来**的，
 低段能稳定落进窗口；把 `k` 拧高去追 shadow/blackout 的窗口时，就有相当比例的候选掉出窗外，被 `out_of_band` 拒。
 `tools/bake.mjs` 把这些拒绝**打印出来**而不是藏起来。
 
-拒绝原因恰好四个（`REJECT_REASONS`，`js/core/make.js:33`，`test/make.test.mjs` 钉死词表）：
+拒绝原因恰好四个（`js/core/make.js:33` 的 `REJECT_REASONS`，`test/make.test.mjs` 钉死词表）：
 
 | reason | 何时触发 | 现实里会吗 |
 |---|---|---|
@@ -152,7 +152,7 @@ hashSeed('a')  =  723832900   (0x2b24d044)
 **画面必须与代数逐格一致**，所以图元全程序绘制（无图片/精灵/字体）。
 
 几何是**公共契约**的一部分：`cellCenter(i)` / `cellRect(i)` / `cellAt(x,y)`（经 `window.lights` 暴露，
-`js/main.js:416-419`）把格序号 ↔ 像素双向映射。这意味着**手指点格 7、路由切到格 7、CDP 派发一个落在格 7 的
+`js/main.js:454-457`）把格序号 ↔ 像素双向映射。这意味着**手指点格 7、路由切到格 7、CDP 派发一个落在格 7 的
 `Input.dispatchMouseEvent`——三者是同一个键**。`@pointer`（第 6 节）能存在全靠这里几何是公开且唯一的。
 
 对局状态机 `js/core/game.js` 是纯的：`press`（`:33`）是**唯一**改盘面的动作，一次异或 + 一次计数；

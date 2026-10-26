@@ -11,6 +11,8 @@ import { hashSeed, todayKey } from './core/rng.js';
 import { createView } from './view.js';
 import { createClock } from './clock.js';
 import { createAudio } from './audio.js';
+// 触觉是第三路反馈：`navigator.vibrate` 在 iOS Safari 上不存在，模块自己会空操作。
+import { haptics } from './haptics.js';
 
 const dom = {
   canvas: document.getElementById('panel'),
@@ -468,6 +470,7 @@ function bind() {
   dom.answerKey.addEventListener('click', () => {
     state.showAnswer = !state.showAnswer;
     audio.play('ui');
+  haptics.tap();
     paint();
   });
   dom.restart.addEventListener('click', () => attemptReset());
@@ -543,6 +546,7 @@ function settle() {
   if (index >= 0) store.unlock(index + 2);
   if (state.mode === 'daily') store.markDaily(todayKey(), lot.id);
   audio.play('win');
+  haptics.correct();
   return rec;
 }
 
@@ -552,6 +556,7 @@ function pressKey(j) {
   // 暂停不是只把画面盖住：仿真、计时和输入在这一态下全部不推进。
   if (state.paused || state.helpOpen) {
     audio.play('deny');
+  haptics.wrong();
     return false;
   }
   const before = boardCells(game);
@@ -570,6 +575,7 @@ function stepBack() {
   if (!state.game || state.paused || state.helpOpen) return;
   if (!undo(state.game)) return;
   audio.play('ui');
+  haptics.tap();
   paint();
 }
 
