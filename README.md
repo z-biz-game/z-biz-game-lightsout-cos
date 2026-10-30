@@ -74,8 +74,10 @@ blackout 包络 11–15，落在 11–14。两者并排存着、各测一次，`
 ## 承诺表：每条承诺都指着会让它红的那条命令
 
 左列是本仓对外说的话，中列是**本轮真的跑过、并且真的能让它红**的命令，右列是这次的实际读数。
-本轮（2026-10-03）所有读数都来自这个 checkout（`git ls-files | wc -l` = 52：本轮新增的那条闸
-`tools/doctest.mjs`、那台台账 `tools/sabotage.py`，以及部署集闸留下的那三份文件）。
+本轮所有读数都来自这个 checkout；并线艺术批次后于 2026-10-29 复跑（`git ls-files | wc -l` = 75：
+比上轮多的 23 个是 `icons/`、`art/` 下的位图与 `css/studio.css`、`js/haptics.js`、`js/sw-register.js`
+这些设计层文件）。那台文档闸 `tools/doctest.mjs` 与台账 `tools/sabotage.py` 都还在跑，
+下面的读数就是这一轮复跑的。
 
 | 承诺 | 会让它红的命令 | 它到底在比什么 | 本轮实测 |
 |---|---|---|---|
@@ -85,15 +87,15 @@ blackout 包络 11–15，落在 11–14。两者并排存着、各测一次，`
 | 难度带互不重叠，屏幕上那条带 == 文件里量出来的那条 | 同上 + `node test/make.test.mjs` | `TIERS_META` 的 `[min,max]` 必须等于 32 行现算的 min/max，且后一档的 min 严格大于前一档的 max | 第 8 枪（dim 的 `max` 从 5 放宽到 7）**只红 1 条**：`the bands on screen are the bands in the file` |
 | 同一天 / 同一个 id 在任何设备上都是同一个盘 | 同上 | 测试自己按公布规则重算一遍下标：`hashSeed('daily\|<date>') % 32`，再与 `dailyLot(date)` 比 | 第 9 枪（选盘改成恒定 `list[0]`）红在 `a shared pick is the same pick, and it is the pick the URL promises` |
 | 三星只发给"打平 par"的人，多按一手就退星 | `node test/game.test.mjs` | `grade` 的四档边界：`par` / `par+1` / `par+2` / `par+3` 各一条 | `rows: 12 fail: 0`。**这条本轮才有闸**：见下面破坏试验第 4 枪 |
-| 存档 `best` 只会变小、`perfect` 粘住、`plays` 只加 | `node test/storage.test.mjs` | 假 localStorage：写进去再读回来、单调性、清档真清、坏档/未来形状不信 | `rows: 9 fail: 0`；第 5 枪（best 改成留最差）红在 `best only goes down, perfect is sticky, plays only counts` |
+| 存档 `best` 只会变小、`perfect` 粘住、`plays` 只加 | `node test/storage.test.mjs` | 假 localStorage：写进去再读回来、单调性、清档真清、坏档/未来形状不信 | `rows: 11 fail: 0`；第 5 枪（best 改成留最差）红在 `best only goes down, perfect is sticky, plays only counts` |
 | `hashSeed` 不是教科书 FNV-1a（它是分享链接稳定的地基） | `node test/rng.test.mjs` | 每字符两轮 UTF-16 混合的**逐位期望值**，另把游戏用到的每颗 seed 钉到第二套实现 | `rows: 10 fail: 0`（这一套就占了 11981 次断言）；第 6 枪（抹掉第二轮）红在 `two rounds per character: a variant, and knowingly not textbook FNV-1a` |
 | 生成器只出货"带内、可解、不重复"的盘 | `node test/make.test.mjs` | 拒绝原因词表必须**恰好**是 `bake.mjs` 打印的那四个，多一个少一个都算红 | `rows: 8 fail: 0`；第 10 枪（dim 的窗口放宽到 `[4,9]`）红在 `the ladder is four bands, each with a key dial and a measured par window` |
 | 每一关都能用真鼠标点完、点数与星级都对 | `bash tools/verify.sh` 的 `@pointer` | CDP `Input.dispatchMouseEvent` 发**真**事件，坐标取自 `js/view.js` 的 `cellCenter()`，从不叫 `window.lights` 代劳 | `rows: 21 fail: []`；全程 `(no console output)` |
-| **本文印的每一个数都还等于现在的代码**（秩表、四带表、包络与落点、套件分账、腿清单、端口、脚本清单、CI 步、行号引用、追踪文件数） | `node tools/doctest.mjs` | 一组等式，每一条都配一句"解析到了几行"的反空转断言：正则没命中不是绿，是红；套件分账那一档是**真的把 9 套现跑一遍**再比文档。这条闸自己有几行等式不在本文里印（加了断言就会漂），它由命令自己打印，见门禁清单 | 见下面门禁清单的「文档闸」那一行；台账 L14–L22 九把刀逐条证明它咬得动，L23–L25 三把证明它不把散文当数，L32 证明行号漂到隔壁一行也会红 |
+| **本文印的每一个数都还等于现在的代码**（秩表、四带表、包络与落点、套件分账、腿清单、端口、脚本清单、CI 步、行号引用、追踪文件数） | `node tools/doctest.mjs` | 一组等式，每一条都配一句"解析到了几行"的反空转断言：正则没命中不是绿，是红；套件分账那一档是**真的把 10 套现跑一遍**再比文档。这条闸自己有几行等式不在本文里印（加了断言就会漂），它由命令自己打印，见门禁清单 | 见下面门禁清单的「文档闸」那一行；台账 L14–L22 九把刀逐条证明它咬得动，L23–L25 三把证明它不把散文当数，L32 证明行号漂到隔壁一行也会红 |
 | 上面这条闸不是装饰品：它自己有一把刀，砍掉"有人在跑它"就红 | `python3 tools/sabotage.py` 的 L26–L29 | 在副本里分别摘掉 CI 的台账步、CI 的文档闸步、`package.json` 的 `sabotage` 脚本、README 里那句指向台账的话 | 四把都红在 `D12` 那条接线断言上，打印 `ci=缺 · pkg=在 · readme=在 · knife=在` 这样的分账（只缺一处、其余在位）|
 | 一个语法错的文件不许上线 | CI 的 `Syntax` 步（`.github/workflows/ci.yml:24-25`），本地 `npm run check` | 对 `js/**`、`server.cjs`、`electron/main.cjs`、`tools/*.mjs`、`test/*.mjs` 逐个 `node --check` | `npm run check` → `OK`（本轮展开成 26 个文件） |
 
-node 层合计本轮 **`rows: 94 / asserts: 21151 / fail: 0`**（9 个套件，见下面门禁清单的加总）；
+node 层合计本轮 **`rows: 102 / asserts: 21238 / fail: 0`**（10 个套件，见下面门禁清单的加总）；
 浏览器层 **`rows: 92 / fail: []`**，`bash tools/verify.sh` 交回 `=== ALL GREEN ===`（退出码 0）。
 
 ## 破坏试验：把每条承诺真的破坏一次
@@ -119,9 +121,9 @@ node 层合计本轮 **`rows: 94 / asserts: 21151 / fail: 0`**（9 个套件，�
 | L9 | 每日选盘改成恒定第 0 关 | `library` | 红 1 条：`a shared pick is the same pick, and it is the pick the URL promises` |
 | L10 | 生成窗口 dim 放宽到 `[4,9]` | `make` | 红 1 条：`the ladder is four bands, each with a key dial and a measured par window` |
 | L11 | `isSolvable` 一律返回 `true` | `solve` | 红 1 条：`isSolvable agrees with solve, including on the boards that are not` |
-| L12 | （**不该红**）改一盏灯的灯光颜色常量 `--lamp` | 全部 9 套 + 文档闸 | 无 —— 配色不是承诺，没有任何命令读 CSS 的那个字节 |
-| L13 | （**不该红**）换掉首页那句存档说明的一个词 | 全部 9 套 + 文档闸 | 无 —— 文案不是承诺 |
-| L14 | 文档印的追踪文件数比仓里少一个（52 → 51） | `tools/doctest.mjs` | 红 1 条：`D10 文档说的追踪文件数等于 git ls-files 现在的数（新增一个文件要一起改文档）` |
+| L12 | （**不该红**）改一盏灯的灯光颜色常量 `--lamp` | 全部 10 套 + 文档闸 | 无 —— 配色不是承诺，没有任何命令读 CSS 的那个字节 |
+| L13 | （**不该红**）换掉首页那句存档说明的一个词 | 全部 10 套 + 文档闸 | 无 —— 文案不是承诺 |
+| L14 | 文档印的追踪文件数比仓里少一个（75 → 74） | `tools/doctest.mjs` | 红 1 条：`D10 文档说的追踪文件数等于 git ls-files 现在的数（新增一个文件要一起改文档）` |
 | L15 | 分账表把 `grid` 的 asserts 手抄成一个邻近的数（5077 → 5078） | 同上 | 红 1 条：`D4 grid 现跑 rows 11 / asserts 5077：文档那两格等于现测` |
 | L16 | 四带表把昏黄的实测 par 区间写宽一格（4–5 → 4–6） | 同上 | 红 1 条：`D2 dim 那一行等于 summaryTable() 的现量（关数 / par / 中位 / 亮格 / 旋钮）` |
 | L17 | 浏览器表少写一条腿（删掉 `@pointer` 那一行） | 同上 | 红 2 条：`D5a`（少一行）与 `D5b`（腿名集合不再等于 verify.sh 的那五条） |
@@ -137,7 +139,7 @@ node 层合计本轮 **`rows: 94 / asserts: 21151 / fail: 0`**（9 个套件，�
 | L27 | 摘掉 CI 里跑文档闸的那一步 | 同上 | 红 2 条：`D8 node tools/doctest.mjs …`（工作流里没有这一步）+ `D12`（`doctest_ci=缺`，其余五处在） |
 | L28 | 摘掉 `package.json` 的 `sabotage` 脚本 | 同上 | 红 2 条：`D7 文档脚本表覆盖 package.json 的每一条`（README 还写着这条）+ `D12`（`pkg=缺`） |
 | L29 | 把 README 里所有指向台账的话改掉（本轮七处一起） | 同上 | 红 1 条：`D12`（`readme=缺`，其余六处在）。这把用的是 `edit_all`：只改一处不会让那根线断，针数不对就当打不中 |
-| L30 | 本地那道门的 `LOGIC_EXPECTS` 把 doctest 钉小 2 | 同上 | 红 1 条：`D13b`（打印 `钉 69 · 实跑 71`）。钉改小一条就够——门看见的是"闸变窄了"，不是"这次没跑到" |
+| L30 | 本地那道门的 `LOGIC_EXPECTS` 把 doctest 钉小 2 | 同上 | 红 1 条：`D13b`（打印 `钉 70 · 实跑 72`）。钉改小一条就够——门看见的是"闸变窄了"，不是"这次没跑到" |
 | L31 | 摘掉 `tools/verify.sh` 里跑文档闸的那一行调用 | 同上 | 红 1 条：`D13d`（打印 `node 套件=1 · doctest=0 · sabotage=1`）。注释里提一句路径不算调用，这一条正是为了让"注释里写了"蒙不过去 |
 | L32 | 把本文那条 `applyPress` 的行号引用挪歪一格（57 → 58，还在文件里，越界检查看不见） | 同上 | 红 1 条：`D9c 贴着引用的那个名字真的出现在被指的那几行里（行号漂到隔壁一行要红）` |
 
@@ -188,9 +190,9 @@ CI 那一遍用 `SKIP_UNIT=1` 跳过这一段（那三步在 unit job 里各自�
 **文档行号这条腿这一轮换成了 fleet 同源的规则**（`tools/doctest.mjs` 的 `D9a`–`D9j`）。两处升级：
 输入集从目录现数（以前只读 README+DESIGN，`deliverable.md` 里那 13 条引用一直没人看，而闸照样打印"全部在范围内"），
 以及越界之外还要认**锚点**——贴着引用写在反引号里的那个名字，必须真的出现在被指的那几行里。
-只查越界抓不住"漂到隔壁一行"，本轮清出来的两条全都稳稳在界内：`server.cjs:48` 那行是 `port = 5190` 这个默认参数，
-`PORT` 环境变量在 `server.cjs:59`；`deliverable.md` 里"改盘面唯一入口"那条曾写作 `js/main.js:33-42`，
-而 `press` 实际在 `js/main.js:295`。两种都改成了各自指到的那一行，文档没有顺手把检查改宽。
+只查越界抓不住"漂到隔壁一行"，本轮清出来的两条全都稳稳在界内：`server.cjs:51` 那行是 `port = 5190` 这个默认参数，
+`PORT` 环境变量在 `server.cjs:62`；`deliverable.md` 里"改盘面唯一入口"那条曾写作 `js/main.js:33-42`，
+而 `press` 实际在 `js/main.js:563`。两种都改成了各自指到的那一行，文档没有顺手把检查改宽。
 五种贴法都认：`applyPress`（`js/core/grid.js:57`）这种前后两向、`path:NN` 的 `name`、`fn(a, b)` 的调用形式、
 `dir/file.js::symbol` 的符号形式；带空格的命令行 body（`npm run doctest`）与纯标点间隔（`，`、`、`）不构成指认，
 按它们钉只会造出假红。它还读**续引**：完整引用后面光写几个数字的那种写法，本仓文档里成片都是这么写的，
@@ -237,9 +239,9 @@ node server.cjs            # http://127.0.0.1:5190/  （ES module 需要 origin�
 
 | script | 命令 | 本轮状态 |
 |---|---|---|
-| `start` / `dev` | `node server.cjs` / `node server.cjs 5190` | 可跑；只绑 `127.0.0.1`（`server.cjs:52`） |
-| `check` | 对 `js/**`、`server.cjs`、`electron/main.cjs`、`tools/*.mjs`、`test/*.mjs` 逐个 `node --check` | `OK`（27 个文件，含本轮新增的 `tools/doctest.mjs`）。它靠 **shell 通配**展开，所以进不了某个目录时是"扫到 0 个文件"而不是报错 |
-| `unit` | `for f in test/*.test.mjs; do node "$f"; done` | 9 个套件逐个跑，`rows: 94 / asserts: 21151 / fail: 0`。**别改成 `node --test test/`**：node 22（CI 那台）拿到目录参数时一个文件都找不到，只报一条名为 `test` 的失败，看起来像"测试跑了没通过"，其实一道都没跑 |
+| `start` / `dev` | `node server.cjs` / `node server.cjs 5190` | 可跑；只绑 `127.0.0.1`（`server.cjs:55`） |
+| `check` | 对 `js/**`、`server.cjs`、`electron/main.cjs`、`tools/*.mjs`、`test/*.mjs` 逐个 `node --check` | `OK`（34 个文件，含 `tools/doctest.mjs`）。它靠 **shell 通配**展开，所以进不了某个目录时是"扫到 0 个文件"而不是报错 |
+| `unit` | `for f in test/*.test.mjs; do node "$f"; done` | 10 个套件逐个跑，`rows: 102 / asserts: 21238 / fail: 0`。**别改成 `node --test test/`**：node 22（CI 那台）拿到目录参数时一个文件都找不到，只报一条名为 `test` 的失败，看起来像"测试跑了没通过"，其实一道都没跑 |
 | `test` | `npm run check && npm run unit` | 绿 |
 | `bake` | `node tools/bake.mjs` | 本轮**没有跑**（它会重写 `js/data/lots.js`）。它是构建期管线：出题 → 逐关复验 → 4×4 再用按键图 BFS 复核 → 全绿才写文件 |
 | `verify` | `bash tools/verify.sh` | `=== ALL GREEN ===`，退出码 0（本文所有读数都来自这条） |
@@ -270,7 +272,7 @@ CI 的入口与本地是同一条命令（下表左边那列在终端里一样�
 
 ## 门禁清单：本轮逐条复跑
 
-`for f in test/*.test.mjs; do node "$f"; done` → **`rows: 94 / asserts: 21151 / fail: 0`**。
+`for f in test/*.test.mjs; do node "$f"; done` → **`rows: 102 / asserts: 21238 / fail: 0`**。
 每个套件单独跑一遍的分账（本轮实测）：
 
 | 套件 | rows | asserts | 套件 | rows | asserts |
@@ -278,11 +280,12 @@ CI 的入口与本地是同一条命令（下表左边那列在终端里一样�
 | `grid` | 11 | 5077 | `make` | 8 | 742 |
 | `rng` | 10 | 11981 | `library` | 10 | 396 |
 | `gf2` | 14 | 741 | `game` | **12**（本轮 +1） | 419（+4） |
-| `gf2-vs-bfs` | 10 | 1079 | `storage` | 9 | 69 |
-| `solve` | 10 | 647 | **加总** | **94** | **21151** |
+| `gf2-vs-bfs` | 10 | 1079 | `storage` | 11 | 93 |
+| `solve` | 10 | 647 | `sw-shell` | 6 | 63 |
+| **加总** | **102** | **21238** | | | |
 
-文档闸 `node tools/doctest.mjs` 本轮读数 **`rows: 71 fail: 0`**；带上浏览器现量再跑
-（`node tools/doctest.mjs --measured <json>`）是 **`rows: 77 fail: 0`**，多出来的 6 行就是
+文档闸 `node tools/doctest.mjs` 本轮读数 **`rows: 72 fail: 0`**；带上浏览器现量再跑
+（`node tools/doctest.mjs --measured <json>`）是 **`rows: 78 fail: 0`**，多出来的 6 行就是
 `D5d` 加五条腿的行数对比。这两个数由这条命令自己在末行打印，抄在这里只为对账；它不进上面任何等式，
 因为断言一多这个数就漂——漂了也不算回归。
 
@@ -338,7 +341,7 @@ js/data/lots.js     构建期产物：TIERS_META + 32 行带实测 par 的关卡
 
 | 用途 | 值 | 定义处 |
 |---|---|---|
-| 手工试玩 | `http://127.0.0.1:5190/` | `server.cjs:48`（`port = 5190` 默认值）、`server.cjs:59`（`PORT` 环境变量或 argv[2] 可换） |
+| 手工试玩 | `http://127.0.0.1:5190/` | `server.cjs:51`（`port = 5190` 默认值）、`server.cjs:62`（`PORT` 环境变量或 argv[2] 可换） |
 | 本地复验 | `WEB_PORT=5190`、`CDP_PORT=9341` | `tools/verify.sh:15-16`，可被同名环境变量覆盖 |
 | 页面内路由 | `#/`（战役）、`#/daily`、`#/lot/<id>` | `js/main.js:57-64`，认不出来返回 `mode: 'unknown'` |
 | 线上 | `https://z-biz-game.github.io/z-biz-game-lightsout-cos/` | Pages 带仓名前缀，所以 `css/`、`js/` 一律写相对路径 |
@@ -358,7 +361,7 @@ js/data/lots.js     构建期产物：TIERS_META + 32 行带实测 par 的关卡
 - **"每档都出得了题"这类承诺不适用。** 本作不现场出题：出货的是 32 行固定数据，`make.js` 只在 bake/test 里跑。
 - **浏览器层只走两关**（`@pointer` 打 dim-01 与 faint-01），不是 32 关全点。其余 30 关由 node 层的
   `library`/`gf2-vs-bfs` 复算；"每一关都能用真手势点完"这句话的严格版本没有闸。
-- **`rows: 94` 不是"94 条独立性质"**，`asserts: 21151` 也不是。它们是本次实跑的计数，用来核对
+- **`rows: 102` 不是"102 条独立性质"**，`asserts: 21238` 也不是。它们是本次实跑的计数，用来核对
   "套件有没有静默少跑文件"，不是质量分。
 - **视觉与文案没有闸**：破坏试验第 12、13 枪实测不红。配色（`css/game.css`）与界面措辞改了不会有任何命令失败，
   所以别把它当成"验证过好看"。屏幕阅读器、色觉无障碍同样没有承诺。
