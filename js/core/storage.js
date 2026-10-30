@@ -159,36 +159,6 @@ function decode(parsed) {
   };
 }
 
-// 数字字段的归一自带一份，不依赖仓里有没有 count() —— 少一层隐式耦合。
-function recordNum(v) {
-  const n = Number(v);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
-}
-
-// 存档两段式解码的第一段：整档 JSON 落到这里之后，**逐字段**归一。
-// 一条记录不是"能用/不能用"二选一 —— 类型错的字段自己退成默认值，整条照样留下。
-// 第二段（sanitizeRecords）在下面：它只丢掉归一后彻底没意义的记录，别的记录不受牵连。
-function sanitizeRecord(r) {
-  if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
-  const out = {};
-  out.solved = !!r.solved;
-  out.best = recordNum(r.best);
-  out.plays = recordNum(r.plays);
-  out.perfect = !!r.perfect;
-  return out;
-}
-
-// 逐条隔离：坏的那条丢掉，好的那些原样留下，绝不因为一条把整份存档作废。
-function sanitizeRecords(p) {
-  const out = {};
-  if (!p || typeof p !== 'object' || Array.isArray(p)) return out;
-  for (const [id, rec] of Object.entries(p)) {
-    const clean = sanitizeRecord(rec);
-    if (clean) out[id] = clean;
-  }
-  return out;
-}
-
 function load() {
   if (cache) return cache;
   const store = current();
@@ -206,13 +176,7 @@ function load() {
       // 版本门：只认本仓写出去的版本。将来升 v2 时，旧档宁可整档丢弃也不能被误读成新档。
       if (p && typeof p === 'object' && !Array.isArray(p)
           && (p.v === undefined || p.v === SAVE_VERSION)) {
-        const base = blank();
-        cache = {
-          records: sanitizeRecords(p.records),
-          daily: p.daily && typeof p.daily === 'object' ? p.daily : base.daily,
-          unlocked: Number(p.unlocked) > 0 ? Number(p.unlocked) : base.unlocked,
-          stats: { ...base.stats, ...(p.stats || {}) },
-        };
+        cache = decode(p);
         return cache;
       }
     } catch (err) {
