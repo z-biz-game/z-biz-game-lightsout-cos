@@ -185,7 +185,7 @@ hashSeed('a')  =  723832900   (0x2b24d044)
   固定 sleep 打线上就是假故障（canvas 停在未样式化的默认 300×150）。
 - **`verify.sh`**：Chrome 用 `mktemp -d` 独立 profile；轮 `/json/version` **和** web 根都活再开始；
   `trap cleanup EXIT` 里 `wait` 掉后台 PID；结果 JSON 用**花括号计数**从 console 截；支持 `SKIP_UNIT=1`（CI browser job）。
-- **`<link rel="icon" href="data:,">`**（`index.html:8`）：否则 favicon 404 污染"console 干净"断言。
+- **真 favicon 文件**（`index.html:20-21`，`icons/favicon-32.png` / `icons/favicon-16.png`）：不再用 `data:,` 占位；`@boot` 逐条 `fetch` 每个 `link[rel="icon"]`，404 会红，console 也就不会被 favicon 噪音污染。
 
 ---
 

@@ -392,12 +392,15 @@ const SCENARIOS = {
     rec('the board starts lit, so nobody can win by doing nothing',
       (() => { const s = g.summary(); return s.lit >= 1 && s.done === false; })(), g.summary());
     rec('the crumbs name the level and its band', /关卡 1 \\//.test(g.summary().crumbs) && /微光/.test(g.summary().crumbs), g.summary().crumbs);
-    const icon = document.querySelector('link[rel="icon"]');
-    rec('the page asks for no favicon file', !!icon && icon.getAttribute('href') === 'data:,', icon && icon.getAttribute('href'));
+    const iconLinks = [...document.querySelectorAll('link[rel="icon"]')];
+    const iconOks = await Promise.all(iconLinks.map(async (l) => (await fetch(l.href)).ok));
+    rec('every favicon the page names is a real file, so the console stays clean',
+      iconLinks.length >= 2 && iconOks.every(Boolean),
+      { icons: iconLinks.map((l) => l.getAttribute('href')), ok: iconOks });
     rec('no script or stylesheet reaches outside this origin',
       [...document.querySelectorAll('script[src],link[href]')].every((el) => {
         const h = el.getAttribute('href') || el.getAttribute('src');
-        return h === 'data:,' || !/^https?:/i.test(h);
+        return !/^https?:/i.test(h);
       }), [...document.querySelectorAll('script[src],link[href]')].map((el) => el.getAttribute('href') || el.getAttribute('src')));
     rec('the shell keeps the numbers on screen reproducible: par is baked, not computed here',
       g.state.lot.par === g.state.lot.spec.par && typeof g.state.lot.spec.par === 'number', g.state.lot.spec);

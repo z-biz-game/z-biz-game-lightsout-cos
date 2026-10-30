@@ -110,12 +110,14 @@ test('the two in-game bitmaps the view loads really exist', () => {
 });
 
 test('the icon the store listing and the social card use are real pictures', () => {
-  const touch = pngSize('art/icons/apple-touch-icon.png');
+  const touch = pngSize('icons/apple-touch-icon.png');
   ok(touch.w >= 180 && touch.h >= 180, `apple-touch-icon is ${touch.w}x${touch.h}, needs >=180`);
   const og = pngSize('art/og.png');
   eq([og.w, og.h], [1200, 630], 'the social card is 1200x630 or the markup lies about it');
   const html = read('index.html');
-  ok(/og:image" content="art\/og\.png"/.test(html), 'index.html still points og:image at the card');
+  // 抓取器不会替我们补站点前缀，所以这句必须是 Pages 下的绝对 URL（deploy-set 的 R7 也这么判）。
+  ok(/og:image" content="https:\/\/z-biz-game\.github\.io\/z-biz-game-lightsout-cos\/art\/og\.png"/.test(html),
+    'index.html still points og:image at the card');
   ok(/og:image:width" content="1200"/.test(html) && /og:image:height" content="630"/.test(html),
     'the declared card dimensions match the file');
 });
@@ -124,12 +126,13 @@ test('the sw keeps one VERSION-derived cache name and a network-first fetch path
   const src = read('sw.js');
   const version = /const VERSION = '([^']+)'/.exec(src);
   ok(version, 'sw.js declares VERSION');
-  eq(version[1], 'v2', 'the shell content changed, so the cache name had to change with it');
+  eq(version[1], 'v3', 'the shell content changed, so the cache name had to change with it');
   ok(/^lightsout-\$\{VERSION\}$/.test(/const CACHE = `([^`]+)`/.exec(src)[1]),
     'the cache name is derived from VERSION, not typed twice');
   ok(/event\.respondWith\(networkFirst\(req, url\)\)/.test(src), 'the fetch handler goes through networkFirst');
-  const html = read('index.html');
-  ok(/location\.protocol === 'http:' \|\| location\.protocol === 'https:'/.test(html),
+  // 注册拆在 js/sw-register.js 里（index.html 只引它一行）；file:// 下必须跳过而不是抛。
+  const reg = read('js/sw-register.js');
+  ok(/'serviceWorker' in navigator/.test(reg) && /location\.protocol/.test(reg),
     'SW registration is skipped under file:// instead of throwing');
 });
 

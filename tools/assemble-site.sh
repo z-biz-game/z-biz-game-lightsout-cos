@@ -21,6 +21,10 @@ cp -r css js "$DEST/"
 for d in icons assets; do
   [ -d "$d" ] && cp -r "$d" "$DEST/"
 done
+# art/ 只收浏览器真会要的三处：运行时纹理、精灵与社交卡。art/gen/ 是生成器与报告，不进站点。
+mkdir -p "$DEST/art"
+cp -r art/textures art/sprites "$DEST/art/"
+cp art/og.png "$DEST/art/"
 
 # 不进站点的（有意为之，别"顺手加上"）：
 #   server.cjs / electron/     本地与桌面形态的宿主，浏览器用不到，传上去只是把源码摊开

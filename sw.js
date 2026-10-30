@@ -9,7 +9,9 @@
 // cache 名带 VERSION：发版时改这一个常量，activate 里旧版本缓存整批删掉。
 // v1 -> v2：v1 的 SHELL 漏了 js/audio.js 和 js/clock.js。它们是 js/main.js 的 `import`，
 // ES module 图缺一块整页就是白屏，而"装完 shell 立刻断网"正好踩在这一条上。
-const VERSION = 'v2';
+// v2 -> v3：设计层进城（css/studio.css、js/haptics.js、js/sw-register.js）并把图标从
+// art/icons/ 换到 icons/——旧清单里那一批路径在产物里已经不存在，预热会全军覆没。
+const VERSION = 'v3';
 const CACHE = `lightsout-${VERSION}`;
 
 // 装包时预热的外壳。缺一个也不报错（下面的 catch 吞掉），因为离线能不能开是次要的，
@@ -19,11 +21,15 @@ const CACHE = `lightsout-${VERSION}`;
 const SHELL = [
   './',
   './index.html',
+  './manifest.webmanifest',
   './css/game.css',
+  './css/studio.css',
   './js/main.js',
   './js/view.js',
   './js/audio.js',
   './js/clock.js',
+  './js/haptics.js',
+  './js/sw-register.js',
   './js/core/game.js',
   './js/core/grid.js',
   './js/core/gf2.js',
@@ -33,15 +39,9 @@ const SHELL = [
   './js/core/solve.js',
   './js/core/storage.js',
   './js/data/lots.js',
-  './manifest.webmanifest',
-  './favicon.ico',
-  './art/icons/icon-16.png',
-  './art/icons/icon-32.png',
-  './art/icons/icon-48.png',
-  './art/icons/icon-96.png',
-  './art/icons/icon-192.png',
-  './art/icons/icon-512.png',
-  './art/icons/apple-touch-icon.png',
+  './icons/favicon-16.png',
+  './icons/favicon-32.png',
+  './icons/apple-touch-icon.png',
   './art/textures/plate-grain-256.png',
   './art/sprites/spark-64.png',
 ];

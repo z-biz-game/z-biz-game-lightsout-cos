@@ -13,7 +13,7 @@
 
 | 字段 | 值 | 复现命令 |
 |---|---|---|
-| **App 名称** | 熄灯盘 | `head -1 README.md` → `# 熄灯盘 · LIGHTSOUT`（取中文部分，与 `index.html:9` `<title>` 一致） |
+| **App 名称** | 熄灯盘 | `head -1 README.md` → `# 熄灯盘 · LIGHTSOUT`（取中文部分，与 `index.html:16` `<title>` 一致） |
 | 仓 | `/Users/zifang/workplace/ceo_workplace/z-biz-game/z-biz-game-lightsout-cos` | — |
 | 一句话玩法 | 一块 `n×n` 灯盘，按一格翻转它和上下左右，目标是把亮灯全按熄；每关印一个"最少按几次"的 `par` | `js/core/grid.js:57`（一次按键 = 一次异或） |
 | 难度/par 的来源 | GF(2) 上 `M·x = b` 的**最小权解**，在 `2^nullity` 陪集里穷举；4×4 上再被按键图 BFS **全量 65536 盘**复核 | `node test/gf2-vs-bfs.test.mjs`（打印 `image 4096, diameter 7, mismatches 0`）；`js/core/gf2.js:133` |
@@ -48,7 +48,7 @@
 
 | 文件 | 作用 | 由谁验证 |
 |---|---|---|
-| `index.html` | 壳：顶栏 / `#panel` 画布 / 面板 / 通关卡；`<link rel="icon" href="data:,">`（`index.html:8`） | 语法门 `npm run check`；运行时断言属 `@boot`（未跑，见未实现清单） |
+| `index.html` | 壳：顶栏 / `#panel` 画布 / 面板 / 通关卡；真图标 `icons/favicon-32.png` / `icons/favicon-16.png` / `icons/apple-touch-icon.png`（`index.html:20-22`） | 语法门 `npm run check`；运行时断言属 `@boot`（未跑，见未实现清单） |
 | `css/game.css` | 全部样式，单文件 | 同上：`@boot` "canvas laid out"（未跑）；本会话仅静态存在 |
 | `js/view.js` | canvas 绘制 + `cellCenter/cellRect/cellAt` 几何（供路由/手指/CDP 共用） | `@pointer` 真鼠标坐标取自它（未跑）；`test/game.test.mjs` 不含 view 语义 |
 | `js/main.js` | 路由 `#/`,`#/daily`,`#/lot/<id>`（`parseRoute:51`）、DOM、存档写入、`window.lights`（`:397`） | `@routes`/`@save`/`@pointer`（未跑）；语法门 `npm run check` |
@@ -152,7 +152,7 @@ hashSeed('a') =  723832900  (0x2b24d044)
 | 4 | **[规格主张]** 只信代数一个来源 | 代数若算错（错主元 / 假陪集）不会自己报警 | 第二条独立腿：4×4 全 65536 盘 GF(2) 陪集最小权 vs 不用代数的按键图 BFS，mismatches 0 | 简报 §2；`test/gf2-vs-bfs.test.mjs`（本会话打印 `image 4096, diameter 7, mismatches 0`） |
 | 5 | **[家族教训]** 把"生成包络"与"已发布 min/max"当同一个数 | 两者会静默合并，UI 印出从未落成的区间（gridlock 抄错过的格） | `make.js` 的 `TIERS` 是包络，`lots.js` 的 `TIERS_META` 是实际落成的 min/max；UI 印后者 | `tools/bake.mjs:132-145`；`test/library.test.mjs` "the bands on screen are the bands in the file" |
 | 6 | **[代码注释已记]** 想给 5×5 也做全态 BFS | 2^25=33.5M 盘、像集 8.4M，扫它是几分钟几百 MB，且不增加证据**种类** | `bfsTable` 上界 `MAX_SWEEP_BITS=20`，5×5 **抛错而非钳制**；5×5 采样对账 | `js/core/solve.js:18,43`；`test/gf2-vs-bfs.test.mjs` "the 5x5 graph is too big to sweep, and the code says so instead of hanging" |
-| 7 | **[本仓易踩]** shell/view 自己重推位布局 | 位布局是 `grid.js` 的知识，出现第二份位移就会与规则漂移 | 改盘面唯一入口是 `applyPress`/`press`；view 只提供几何 `cellCenter/cellRect` 不判合法性 | `js/core/grid.js:57`（`applyPress`）；`js/main.js:295` 的 `press`；`js/view.js` 头注 |
+| 7 | **[本仓易踩]** shell/view 自己重推位布局 | 位布局是 `grid.js` 的知识，出现第二份位移就会与规则漂移 | 改盘面唯一入口是 `applyPress`/`press`；view 只提供几何 `cellCenter/cellRect` 不判合法性 | `js/core/grid.js:57`（`applyPress`）；`js/main.js:563` 的 `press`；`js/view.js` 头注 |
 | 8 | **[家族教训]** `localStorage` 当"取不到就是 undefined" | `file://`/隐私模式下**碰属性就抛**，`setItem` 随时抛 Quota | 一切访问经守卫 `backend()`，抛错=退回内存不崩；清档连内存缓存一起换 | `js/core/storage.js:26-34,149-161`；`test/storage.test.mjs` "a localStorage that throws ... is a fallback, not a crash" |
 
 ---
