@@ -193,7 +193,7 @@ KNIVES = [
 
     # ---- 文档侧：这一档咬的是 tools/doctest.mjs 自己 ----
     ('L14', '文档印的追踪文件数比仓里少一个',
-     [('README.md', '`git ls-files | wc -l` = 52', '`git ls-files | wc -l` = 51', 1)],
+     [('README.md', '`git ls-files | wc -l` = 75', '`git ls-files | wc -l` = 74', 1)],
      [GATE],
      'D10 文档说的追踪文件数等于 git ls-files 现在的数（新增一个文件要一起改文档）'),
 
@@ -290,8 +290,8 @@ KNIVES = [
     # ---- D13 那一组钉的是"门也在家门口"。这两把刀各回答一个问题：
     # 钉被悄悄改小会不会红（L30）、调用被摘掉会不会红（L31）。
     ('L30', 'verify.sh 的 LOGIC_EXPECTS 把 doctest 那一项钉小 2',
-     [('tools/verify.sh', 'LOGIC_EXPECTS="doctest:71 sabotage:32"',
-       'LOGIC_EXPECTS="doctest:69 sabotage:32"', 1)],
+     [('tools/verify.sh', 'LOGIC_EXPECTS="doctest:72 sabotage:32"',
+       'LOGIC_EXPECTS="doctest:70 sabotage:32"', 1)],
      [GATE],
      'D13b verify.sh 钉的 doctest 项数等于本闸实跑的项数（增删一条断言要两处一起走）'),
 

@@ -7,7 +7,7 @@
 //
 // 规矩（和 test/*.test.mjs 一样）：
 //   * 每条等式都配一条「解析到的条数」的反空转断言——正则没命中不是绿，是红；
-//   * 能现测的就现测：node 层 9 个套件总共 0.4 秒，所以 D4 是真的把它们跑一遍，
+//   * 能现测的就现测：node 层 10 个套件总共 0.4 秒，所以 D4 是真的把它们跑一遍，
 //     不是拿文档对文档；
 //   * 浏览器层的行数只有真 Chrome 量得到，所以那条等式默认只查名字集合与加总算术，
 //     由 `--measured <json>` 提供读数的才是实测比对（tools/verify.sh 跑完会带上）。
@@ -135,11 +135,14 @@ ok(metaOk && docLanding.length === 2,
   `TIERS_META ${TIERS_META.map((t) => `${t.key} ${t.min}–${t.max}`).join(' / ')} · 现算 ` +
   `${Object.entries(measuredByTier).map(([k, v]) => `${k} ${v.min}–${v.max}`).join(' / ')} · 文档落点句 ${docLanding.length} 条`);
 
-// ---- D4 node 层分账：现跑 9 个套件，文档印的 rows/asserts 逐格对账 ----
+// ---- D4 node 层分账：现跑 10 个套件，文档印的 rows/asserts 逐格对账 ----
 const ledgerCells = {};
 for (const c of tableByHeader('| 套件 | rows | asserts | 套件 | rows | asserts |')) {
-  const pairs = [[c[0], c[1], c[2]], [c[3], c[4], c[5]]];
+  // 末行可以只写「加总」那一对（三格），不再为凑满六格另填一行假的套件名。
+  const pairs = [[c[0], c[1], c[2]]];
+  if (c.length >= 6) pairs.push([c[3], c[4], c[5]]);
   for (const [rawName, r, a] of pairs) {
+    if (rawName === undefined || String(rawName).trim() === '') continue; // 六格末行空着的那半
     const name = rawName.replace(/\*\*/g, '').replace(/`/g, '');
     if (name === '加总') ledgerCells.__total = { rows: num(r), asserts: num(a) };
     else ledgerCells[name] = { rows: num(r), asserts: num(a) };
@@ -169,7 +172,7 @@ const sumAsserts = suiteNames.reduce((s, n) => s + (live[n].asserts || 0), 0);
 const docTotals = [...README.matchAll(/`rows: (\d+) \/ asserts: (\d+) \/ fail: (\d+)`/g)];
 ok(!!ledgerCells.__total && ledgerCells.__total.rows === sumRows && ledgerCells.__total.asserts === sumAsserts &&
     docTotals.length >= 2 && docTotals.every((d) => +d[1] === sumRows && +d[2] === sumAsserts && +d[3] === 0),
-  'D4b 文档印的加总等于九套现跑之和（表里、承诺表、门禁清单说的是同一个数）',
+  'D4b 文档印的加总等于全部套件现跑之和（表里、承诺表、门禁清单说的是同一个数）',
   `现跑合计 rows ${sumRows} / asserts ${sumAsserts} · 表内加总 ${ledgerCells.__total && ledgerCells.__total.rows}/` +
   `${ledgerCells.__total && ledgerCells.__total.asserts} · 文档另有 ${docTotals.length} 处印「rows / asserts / fail」`);
 
